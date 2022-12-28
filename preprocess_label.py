@@ -20,7 +20,7 @@ def label_to_array(label):
     return one_hot_label
 
 def preprocess_midi(path, label):  # midi file->pretty midi(note_seq)->event_seq->control_seq
-    note_seq = NoteSeq.from_midi_file(path)
+    note_seq, _ = NoteSeq.from_midi_file(path)
     note_seq.adjust_time(-note_seq.notes[0].start)
     event_seq = EventSeq.from_note_seq(note_seq)
     # control_seq = ControlSeq.from_event_seq(event_seq)

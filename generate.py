@@ -40,7 +40,7 @@ def getopt():
     parser.add_option('-s', '--session',
                       dest='sess_path',
                       type='string',
-                      default='save/myModel3hour.sess',
+                      default='save/train.sess',
                       help='session file containing the trained model')
 
     parser.add_option('-o', '--output-dir',
@@ -51,7 +51,7 @@ def getopt():
     parser.add_option('-l', '--max-length',
                       dest='max_len',
                       type='int',
-                      default=500)
+                      default=5000)
 
     parser.add_option('-g', '--greedy-ratio',
                       dest='greedy_ratio',
@@ -109,14 +109,17 @@ assert os.path.isfile(sess_path), f'"{sess_path}" is not a file'
 #               '2,0,1,1,0,2,0,2,1,0,1,0':'C小调','3,0,1,1,0,3,0,3,1,0,1,0':'C小调','2,0,1,1,0,2,0,2,1,0,1,0':'C小调',}
 # controls=[';1',';2',';3',';4',';5',';6',';7',';8']
 controls=[]
-name_dict ={'3,0,1,0,1,2,0,2,0,1,0,1;1':'peaceful', '3,0,1,0,1,2,0,2,0,1,0,1;5':'happy',
-             '3,0,1,1,0,2,0,2,1,0,1,0;1':'sad', '3,0,1,1,0,2,0,2,1,0,1,0;5':'tensional'}
+name_dict ={'3,0,1,0,1,2,0,2,0,1,0,1;10':'peaceful', '3,0,1,0,1,2,0,2,0,1,0,1;1':'happy', '3,0,1,0,1,2,0,2,0,1,0,1;5':'peaceful-happy',
+             '3,0,1,1,0,2,0,2,1,0,1,0;10':'sad', '3,0,1,1,0,2,0,2,1,0,1,0;1':'tensional', '3,0,1,1,0,2,0,2,1,0,1,0;5':'sad-tensional',
+             '1,1,1,1,1,1,1,1,1,1,1,1;10': 'slow', '1,1,1,1,1,1,1,1,1,1,1,1;1': 'fast', '1,1,1,1,1,1,1,1,1,1,1,1;5': 'slow-fast'}
 
-for den_num in [1, 5]:
+
+for den_num in [1, 5, 10]:
     # controls.append(f'1,0,1,0,1,1,0,1,0,1,0,1;{den_num}')
     # controls.append(f'1,0,1,1,0,1,0,1,0,1,1,0;{den_num}')
     controls.append(f'3,0,1,0,1,2,0,2,0,1,0,1;{den_num}')
     controls.append(f'3,0,1,1,0,2,0,2,1,0,1,0;{den_num}')
+    controls.append(f'1,1,1,1,1,1,1,1,1,1,1,1;{den_num}')
 
 for control in controls:
     pitch_histogram, note_density = control.split(';')

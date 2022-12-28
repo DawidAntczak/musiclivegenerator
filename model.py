@@ -12,6 +12,8 @@ import config
 
 
 class PerformanceRNN(nn.Module):
+    next_input_data = None
+
     def __init__(self, event_dim, control_dim, init_dim, hidden_dim,
                  gru_layers=3, gru_dropout=0.3):
         super().__init__()
@@ -101,7 +103,7 @@ class PerformanceRNN(nn.Module):
             assert controls.shape[0] >= steps
             return controls[:steps]
         return controls.repeat(steps, 1, 1)
-    
+
     def generate(self, init, steps, events=None, controls=None, greedy=1.0,
                  temperature=1.0, teacher_forcing_ratio=1.0, output_type='index', verbose=False):
         # init [batch_size64, init_dim32] steps音乐样本长度
@@ -116,7 +118,7 @@ class PerformanceRNN(nn.Module):
         if use_teacher_forcing:
             assert len(events.shape) == 2
             assert events.shape[0] >= steps - 1
-            events = events[:steps-1]
+            events = events[:steps - 1]
 
         event = self.get_primary_event(batch_size)
         use_control = controls is not None
@@ -131,10 +133,12 @@ class PerformanceRNN(nn.Module):
 
         for step in step_iter:
             control = controls[step].unsqueeze(0) if use_control else None
-            output, hidden = self.forward(event, control, hidden) # generate output for sampling and hiddenlayer for next iter
+            output, hidden = self.forward(event, control,
+                                          hidden)  # generate output for sampling and hiddenlayer for next iter
 
             use_greedy = np.random.random() < greedy
-            event = self._sample_event(output, greedy=use_greedy,temperature=temperature)  #用greedy直接就选择概率最大的 1*batch_size
+            event = self._sample_event(output, greedy=use_greedy,
+                                       temperature=temperature)  # 用greedy直接就选择概率最大的 1*batch_size
 
             if output_type == 'index':
                 outputs.append(event)
@@ -145,10 +149,10 @@ class PerformanceRNN(nn.Module):
             else:
                 assert False
 
-            if use_teacher_forcing and step < steps - 1: # avoid last one
+            if use_teacher_forcing and step < steps - 1:  # avoid last one
                 if np.random.random() <= teacher_forcing_ratio:
                     event = events[step].unsqueeze(0)
-        
+
         return torch.cat(outputs, 0)
 
     def beam_search(self, init, steps, beam_size, controls=None,
@@ -250,6 +254,49 @@ class PerformanceRNN(nn.Module):
         best = best.contiguous().t()
         return best
 
+    live_generation_context = None
+
+    def init_live_generation(self, init):
+        # init [batch_size64, init_dim32] steps音乐样本长度
+        # events [steps200, batch_size] indeces
+        # controls [1 or steps, batch_size, control_dim]
+        batch_size = init.shape[0]
+        assert init.shape[1] == self.init_dim
+
+        event = self.get_primary_event(batch_size)
+        hidden = self.init_to_hidden(init)
+        self.live_generation_context = dict()
+        self.live_generation_context['event'] = event
+        self.live_generation_context['hidden'] = hidden
+
+    def generate_live(self, steps, controls=None, greedy=1.0, temperature=1.0, output_type='index'):
+        event, hidden = self.live_generation_context['event'], self.live_generation_context['hidden']
+        if controls is not None:
+            control = controls[0].unsqueeze(0)
+        else:
+            control = None
+        outputs = []
+        for _ in range(0, steps):
+            output, hidden = self.forward(event, control, hidden)  # generate output for sampling and hiddenlayer for next iter
+            self.live_generation_context['event'] = event
+            self.live_generation_context['hidden'] = hidden
+
+            use_greedy = np.random.random() < greedy
+            event = self._sample_event(output, greedy=use_greedy,
+                                       temperature=temperature)  # 用greedy直接就选择概率最大的 1*batch_size
+
+            if output_type == 'index':
+                outputs.append(event)
+            elif output_type == 'softmax':
+                outputs.append(self.output_fc_activation(output))
+            elif output_type == 'logit':
+                outputs.append(output)
+            else:
+                assert False
+
+        return torch.cat(outputs, 0)
+
+
 if __name__ == '__main__':
     model_config = config.model
     model = PerformanceRNN(**model_config).to(device)
@@ -260,6 +307,4 @@ if __name__ == '__main__':
     outputs = model.generate(init, 200, events=events[:-1], controls=controls,
                              teacher_forcing_ratio=1, output_type='logit')
 
-
     print('done')
-

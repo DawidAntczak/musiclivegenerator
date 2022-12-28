@@ -2,6 +2,7 @@ import numpy as np
 import copy
 import itertools
 import collections
+from statistics import median, mean
 from pretty_midi import PrettyMIDI, Note, Instrument
 
 
@@ -26,27 +27,30 @@ USE_VELOCITY = True
 BEAT_LENGTH = 60 / DEFAULT_TEMPO
 DEFAULT_TIME_SHIFT_BINS = 1.15 ** np.arange(32) / 65 #non-linear
 DEFAULT_VELOCITY_STEPS = 32
-DEFAULT_NOTE_LENGTH = BEAT_LENGTH * 2
+DEFAULT_NOTE_LENGTH = BEAT_LENGTH / 2
 MIN_NOTE_LENGTH = BEAT_LENGTH / 2
 
 # ControlSeq ----------------------------------------------------------------------
 
 DEFAULT_WINDOW_SIZE = BEAT_LENGTH * 4
 DEFAULT_NOTE_DENSITY_BINS = np.arange(12) * 3 + 1 #[1 4 7 10 ..]
-
+DEFAULT_NOTE_LENGTH_BINS = 1.35 ** np.arange(12) / 25 #[1 4 7 10 ..]
 
 # ==================================================================================
 # Notes
 # ==================================================================================
 
 class NoteSeq:
-
     @staticmethod
     def from_midi(midi, programs=DEFAULT_LOADING_PROGRAMS):
+        instrument_to_notes_count_dict = dict()
+        for inst in midi.instruments:
+            if not inst.is_drum:
+                instrument_to_notes_count_dict[inst.program] = len(inst.notes)
         notes = itertools.chain(*[
             inst.notes for inst in midi.instruments
             if inst.program in programs and not inst.is_drum])
-        return NoteSeq(list(notes))
+        return NoteSeq(list(notes)), instrument_to_notes_count_dict
 
     @staticmethod
     def from_midi_file(path, *args, **kwargs):
@@ -116,7 +120,6 @@ class NoteSeq:
                     last_note.end = note.start
             else:
                 last_notes[note.pitch] = note
-
 
 # ==================================================================================
 # Events
@@ -272,7 +275,7 @@ class EventSeq:
 
         for note in notes:
             if note.end is None:
-                note.end = note.start + DEFAULT_NOTE_LENGTH  # if note do not have an end, end it after 1s.
+                note.end = note.start + DEFAULT_NOTE_LENGTH  # if note do not have an end, end it after 0.25s.
 
             note.velocity = int(note.velocity)
 
@@ -310,6 +313,7 @@ class Control:
 class ControlSeq:
 
     note_density_bins = DEFAULT_NOTE_DENSITY_BINS
+    note_length_bins = DEFAULT_NOTE_LENGTH_BINS
     window_size = DEFAULT_WINDOW_SIZE
 
     @staticmethod
@@ -320,7 +324,7 @@ class ControlSeq:
         pitch_count = np.zeros([12])
         note_count = 0
 
-        controls = []
+        controls, metadatas = [], []
 
         def _rel_pitch(pitch):
             return (pitch - 24) % 12
@@ -345,19 +349,73 @@ class ControlSeq:
                     note_count += 1.
                 end += 1
             # pitch_count -> pitch_histogram #计算每个event 之后两秒内音符的分布
+            #note_ons = list(filter(lambda e: e.type == 'note_on', events[start:end]))
+            #unique_note_on = set(map(lambda e: e.time, note_ons))
             pitch_histogram = (
                 pitch_count / note_count
                 if note_count
                 else np.ones([12]) / 12
             ).tolist()
 
-            note_density = max(np.searchsorted(
+            note_density_bin = max(np.searchsorted(
                 ControlSeq.note_density_bins,
                 note_count, side='right') - 1, 0) #note_count->index(density)
+            controls.append(Control(pitch_histogram, note_density_bin))
 
-            controls.append(Control(pitch_histogram, note_density))
+            #note_length_median = ControlSeq.calculate_min_time_shift(events, start, end)
+            note_length_bin = 0# max(np.searchsorted(
+            #    ControlSeq.note_length_bins,
+            #    note_length_median, side='right') - 1, 0) #note_length_median->index(length)
+            #controls.append(Control(pitch_histogram, note_length_bin))
 
-        return ControlSeq(controls)
+            metadatas.append(PreprocessMetadata(note_count.__int__(),
+                                                0,
+                                                note_density_bin.__int__(),
+                                                note_length_bin.__int__()
+                                                ))
+
+        return ControlSeq(controls, metadatas)
+
+    @staticmethod
+    def calculate_note_length_median(events, window_start, window_end):
+        note_lengths = list()
+        for start, _ in enumerate(events, window_start):
+            if start >= window_end:
+                break
+            if events[start].type == 'note_on':
+                index = start + 1
+                while index < len(events):
+                    if events[index].type == 'note_off' and events[start].value == events[index].value:
+                        note_lengths.append(events[index].time - events[start].time)
+                        break
+                    if events[index].time - events[start].time > DEFAULT_WINDOW_SIZE:
+                        note_lengths.append(DEFAULT_WINDOW_SIZE)
+                        break
+                    index += 1
+        m = DEFAULT_WINDOW_SIZE
+        if note_lengths:
+            m = median(note_lengths)
+        return m
+
+    @staticmethod
+    def calculate_min_time_shift(events, window_start, window_end):
+        ee = list(filter(lambda e: e.type == 'time_shift', events))
+        time_shifts = list()
+        for i, _ in enumerate(events, window_start):
+            if i >= window_end:
+                break
+            if events[i].type != 'time_shift':
+                continue
+            time_shift_sum = 0.
+            while i < window_end and events[i].type == 'time_shift':
+                time_shift_sum += EventSeq.time_shift_bins[events[i].value]
+                i += 1
+            time_shifts.append(time_shift_sum)
+        if time_shifts:
+            m = mean(time_shifts)
+        else:
+            m = 0.
+        return m
 
     @staticmethod
     def dim():
@@ -389,10 +447,13 @@ class ControlSeq:
         phist = array[:, 1:].astype(np.float64) / 255  # [steps, hist_dim]
         return np.concatenate([ndens, phist], 1)  # [steps, dens_dim(12) + hist_dim(12)]
 
-    def __init__(self, controls):
+    def __init__(self, controls, metadatas):
         for control in controls:
             assert isinstance(control, Control)
+        for metadata in metadatas:
+            assert isinstance(metadata, PreprocessMetadata)
         self.controls = copy.deepcopy(controls)
+        self.metadatas = metadatas
 
     def to_compressed_array(self): #control-> [density,p_histogram]
         ndens = [control.note_density for control in self.controls]
@@ -405,13 +466,23 @@ class ControlSeq:
         ], 1)  # [steps, hist_dim(12) + 1]
 
 
+class PreprocessMetadata:
+    note_count, unique_note_count, note_density_bin, note_length_bin = None, None, None, None
+
+    def __init__(self, note_count, unique_note_count, note_density_bin, note_length_bin):
+        self.note_count = note_count
+        self.unique_note_count = unique_note_count
+        self.note_density_bin = note_density_bin
+        self.note_length_bin = note_length_bin
+
+
 if __name__ == '__main__':
     import pickle
     import sys
     path = sys.argv[1] if len(sys.argv) > 1 else 'dataset/midi/ecomp/BLINOV02.mid'
 
     print('Converting MIDI to EventSeq')
-    es = EventSeq.from_note_seq(NoteSeq.from_midi_file(path))
+    es, _ = EventSeq.from_note_seq(NoteSeq.from_midi_file(path))
 
     print('Converting EventSeq to MIDI')
     EventSeq.from_array(es.to_array()).to_note_seq().to_midi_file('/tmp/test.mid')

@@ -16,6 +16,8 @@ import config
 from data import Dataset
 from model import PerformanceRNN
 from sequence import NoteSeq, EventSeq, ControlSeq
+import time
+from datetime import datetime
 
 # pylint: disable=E1102
 # pylint: disable=E1101
@@ -23,6 +25,10 @@ from sequence import NoteSeq, EventSeq, ControlSeq
 #========================================================================
 # Settings
 #========================================================================
+
+print("Started sleeping at: ", datetime.now())
+time.sleep(16800)
+print("Ended sleeping at: ", datetime.now())
 
 def get_options():
     parser = optparse.OptionParser()
@@ -35,7 +41,7 @@ def get_options():
     parser.add_option('-d', '--dataset',
                       dest='data_path',
                       type='string',
-                      default='dataset/processed/NAME')
+                      default='dataset/processed-nes-snes-unique-notes-3')
 
     parser.add_option('-i', '--saving-interval',
                       dest='saving_interval',
