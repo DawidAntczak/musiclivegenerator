@@ -66,7 +66,7 @@ class WsServer:
         return 'Message' in message and message['Message'] == 'STOP'
 
     def is_input_data_message(self, message):
-        return 'PitchHistogram' in message and 'NoteDensity' in message
+        return 'Mode' in message and 'NoteDensity' in message
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(WsServer().start())

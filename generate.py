@@ -109,22 +109,20 @@ assert os.path.isfile(sess_path), f'"{sess_path}" is not a file'
 #               '2,0,1,1,0,2,0,2,1,0,1,0':'C小调','3,0,1,1,0,3,0,3,1,0,1,0':'C小调','2,0,1,1,0,2,0,2,1,0,1,0':'C小调',}
 # controls=[';1',';2',';3',';4',';5',';6',';7',';8']
 controls=[]
-name_dict ={'3,0,1,0,1,2,0,2,0,1,0,1;10':'peaceful', '3,0,1,0,1,2,0,2,0,1,0,1;1':'happy', '3,0,1,0,1,2,0,2,0,1,0,1;5':'peaceful-happy',
-             '3,0,1,1,0,2,0,2,1,0,1,0;10':'sad', '3,0,1,1,0,2,0,2,1,0,1,0;1':'tensional', '3,0,1,1,0,2,0,2,1,0,1,0;5':'sad-tensional',
-             '1,1,1,1,1,1,1,1,1,1,1,1;10': 'slow', '1,1,1,1,1,1,1,1,1,1,1,1;1': 'fast', '1,1,1,1,1,1,1,1,1,1,1,1;5': 'slow-fast'}
+name_dict ={'1,0,0': 'happy', '0,1,0':'sad', '0,0,1':'unknown'}
 
 
 for den_num in [1, 5, 10]:
-    # controls.append(f'1,0,1,0,1,1,0,1,0,1,0,1;{den_num}')
-    # controls.append(f'1,0,1,1,0,1,0,1,0,1,1,0;{den_num}')
-    controls.append(f'3,0,1,0,1,2,0,2,0,1,0,1;{den_num}')
-    controls.append(f'3,0,1,1,0,2,0,2,1,0,1,0;{den_num}')
-    controls.append(f'1,1,1,1,1,1,1,1,1,1,1,1;{den_num}')
+    for pitches_num in [0, 1, 5]:
+        for entropy in [0, 1, 5]:
+            controls.append(f'1,0,0;{den_num};{pitches_num};{entropy}')
+            controls.append(f'0,1,0;{den_num};{pitches_num};{entropy}')
+            controls.append(f'0,0,1;{den_num};{pitches_num};{entropy}')
 
 for control in controls:
-    pitch_histogram, note_density = control.split(';')
+    mode, note_density, avg_pitches_count, entropy = control.split(';')
 
-    control_name = name_dict[control]
+    control_name = name_dict[mode]
     if control is not None: #Get control based on pitch_histogram and note_density
         if os.path.isfile(control) or os.path.isdir(control): # get control info from midi file
             if os.path.isdir(control):
@@ -140,19 +138,23 @@ for control in controls:
             control = f'control sequence from "{control}"'
 
         else:
-            pitch_histogram, note_density = control.split(';')
-            pitch_histogram = list(filter(len, pitch_histogram.split(','))) # to pitch_histogram char list
-            if len(pitch_histogram) == 0:
-                pitch_histogram = np.ones(12) / 12
+            mode, note_density, avg_pitches_count, entropy = control.split(';')
+            mode = list(filter(len, mode.split(','))) # to pitch_histogram char list
+            if len(mode) == 0:
+                mode = np.ones(3) / 3
             else:
-                pitch_histogram = np.array(list(map(float, pitch_histogram))) #to pitch_histogram float nparray
-                assert pitch_histogram.size == 12
-                assert np.all(pitch_histogram >= 0)
-                pitch_histogram = pitch_histogram / pitch_histogram.sum() \
-                    if pitch_histogram.sum() else np.ones(12) / 12
+                mode = np.array(list(map(float, mode))) #to pitch_histogram float nparray
+                assert mode.size == 3
+                assert np.all(mode >= 0)
+                mode = mode / mode.sum() \
+                    if mode.sum() else np.ones(3) / 3
             note_density = int(note_density)
             assert note_density in range(len(ControlSeq.note_density_bins))
-            control = Control(pitch_histogram, note_density)
+            avg_pitches_count = int(avg_pitches_count)
+            assert avg_pitches_count in range(len(ControlSeq.avg_played_pitches_bins))
+            entropy = int(entropy)
+            assert entropy in range(len(ControlSeq.entropy_bins))
+            control = Control(mode, note_density, avg_pitches_count, entropy)
             controls = torch.tensor(control.to_array(), dtype=torch.float32)
             controls = controls.repeat(1, batch_size, 1).to(device) # 1Xbatch_sizeX controls
             control = repr(control)
@@ -217,7 +219,7 @@ for control in controls:
     os.makedirs(output_dir, exist_ok=True)
 
     for i, output in enumerate(outputs):
-        name = f'output-{i}{control_name}.mid'
+        name = f'output-{i}{control_name}-den_{note_density}-pit_{avg_pitches_count}-ent_{entropy}.mid'
         path = os.path.join(output_dir, name)
         n_notes = utils.event_indeces_to_midi_file(output, path)
         print(f'===> {path} ({n_notes} notes)')

@@ -1,64 +1,46 @@
 import functools
-import json
+import math
 import os
+import time
 from concurrent.futures import ProcessPoolExecutor
+from datetime import datetime
+from itertools import islice, chain
 
 import jsonpickle
+import music21
+import muspy
+import numpy as np
 import pretty_midi
 from music21 import *
-import csv
 
 from progress.bar import Bar
 
 import utils
+from models import PreparationMetadata
 
 
 class PreparationResult:
     path = None
     key_analyze = None
+    entropy = None
+    pitch_class_distribution_std_dev = None
+    note_density = None
+    avg_time_between_attacks = None
+    avg_pitches_played = None
 
-    def __init__(self, path, key_analyze):
+    def __init__(self, path, key_analyze, entropy, pitch_class_distribution_std_dev, note_density, avg_time_between_attacks, avg_pitches_played):
         self.path = path
         self.key_analyze = key_analyze
+        self.entropy = entropy
+        self.pitch_class_distribution_std_dev = pitch_class_distribution_std_dev
+        self.note_density = note_density
+        self.avg_time_between_attacks = avg_time_between_attacks
+        self.avg_pitches_played = avg_pitches_played
 
 
-class KeyMetadata:
-    tonic = None
-    mode = None
-    type = None
-    correlation_coefficient = None
-    semitones_to_c = None
-
-    def __init__(self, key_analyze):
-        self.tonic = key_analyze.tonic.name
-        self.mode = key_analyze.mode
-        self.type = key_analyze.type
-        self.correlation_coefficient = key_analyze.correlationCoefficient
-        key_interval = interval.Interval(key_analyze.tonic, pitch.Pitch('C'))
-        self.semitones_to_c = key_interval.semitones + 12 if key_interval.semitones < -6 else key_interval.semitones
-
-
-class PreparationMetadata:
-    path = None
-    name = None
-    primary_key = None
-    secondary_key = None
-
-    def __init__(self, preparation_result):
-        self.path = preparation_result.path
-        self.name = os.path.basename(preparation_result.path)
-        self.primary_key = KeyMetadata(preparation_result.key_analyze)
-        self.secondary_key = KeyMetadata(preparation_result.key_analyze.alternateInterpretations[0])
-
-
-def transpose_to_c(key_analyze, file_path, save_path):
-    #alt_text = ''
-    #for interpretation in key_analyze.alternateInterpretations:
-    #for interpretation in key_analyze.alternateInterpretations:
-    #    alt_text += str(interpretation) + ' ' + str(interpretation.correlationCoefficient) + ' - '
-
-    #print(str(key_analyze) + ' ' + str(key_analyze.correlationCoefficient) + ' --- ' + alt_text + "\n")
-    key_interval = interval.Interval(key_analyze.tonic, pitch.Pitch('C'))
+def transpose_to_common(key_analyze, file_path, save_path):
+    target_tonic_pitch = 'C' if key_analyze.mode == 'major' else 'A'
+    key_interval = interval.Interval(key_analyze.tonic, pitch.Pitch(target_tonic_pitch))
     semitones = key_interval.semitones + 12 if key_interval.semitones < -6 else key_interval.semitones
     midi = pretty_midi.PrettyMIDI(file_path)
     transpose(midi, semitones)
@@ -69,7 +51,7 @@ def transpose(mid, semitones):
     if semitones == 0:
         return
     for inst in mid.instruments:
-        if not inst.is_drum: # Don't transpose drum tracks
+        if not inst.is_drum:    # Don't transpose drum tracks
             for note in inst.notes:
                 note.pitch += semitones
 
@@ -78,56 +60,86 @@ def prepare_midi(path, save_dir, collect_only_metadata=False):
     name = os.path.basename(path)
     save_path = os.path.join(save_dir, name)
 
-    midi_stream = converter.parse(path, quantizePost=False)
+    midi_stream = converter.parse(path)
     key_analyze = midi_stream.analyze('key')
 
     if collect_only_metadata is False:
-        transpose_to_c(key_analyze, path, save_path)
+        transpose_to_common(key_analyze, path, save_path)
 
-    return key_analyze
+    midi = pretty_midi.PrettyMIDI(path)
+    muspy_music = muspy.inputs.from_pretty_midi(midi)
+
+    entropy = muspy.metrics.pitch_entropy(muspy_music).__float__()
+
+    #fe = music21.features.jSymbolic.PitchClassDistributionFeature(midi_stream)
+    #pitch_class_distribution_std_dev = np.std(fe.extract().vector).__float__()
+
+    fe = music21.features.jSymbolic.NoteDensityFeature(midi_stream)
+    note_density = fe.extract().vector[0]
+
+    #fe = music21.features.jSymbolic.AverageTimeBetweenAttacksFeature(midi_stream)
+    #avg_time_between_attacks = fe.extract().vector[0]
+
+    avg_pitches_played = muspy.metrics.polyphony(muspy_music).__float__()
+
+    return PreparationResult(path, key_analyze, entropy, 0, note_density,
+                      0, avg_pitches_played)
 
 
-def prepare_midi_files_under(midi_root, save_dir, num_workers, collect_only_metadata=False):
-    midi_paths = list(utils.find_files_by_extensions(midi_root, ['.mid', '.midi']))
+def batcher(x, bs):
+    return [x[i:i+bs] for i in range(0, len(x), bs)]
+
+
+def prepare_midi_files_under(midi_root, save_dir, num_workers, batch_size=1000, collect_only_metadata=False):
+    midi_paths = list(filter(lambda x: '-speed_00' in x, utils.find_files_by_extensions(midi_root, ['.mid', '.midi'])))
+    #midi_paths = list(filter(lambda x: '-speed_00' in x or '-speed_01' in x or '-speed_03' in x, utils.find_files_by_extensions(midi_root, ['.mid', '.midi'])))
+    #midi_paths = list(utils.find_files_by_extensions(midi_root, ['.mid', '.midi']))
     os.makedirs(save_dir, exist_ok=True)
 
     executor = ProcessPoolExecutor(num_workers)
-    futures = []
-    for path in midi_paths:
-        try:
-            partial_prepare_midi = functools.partial(prepare_midi, path, save_dir, collect_only_metadata)
-            futures.append((path, executor.submit(partial_prepare_midi)))
-        except KeyboardInterrupt:
-            print(' Abort')
-            return
-        except:
-            print(' Error')
-            continue
+    batched_midi_paths = batcher(midi_paths, batch_size)
+    for i, batch in enumerate(batched_midi_paths):
+        futures = []
+        for path in batch:
+            try:
+                partial_prepare_midi = functools.partial(prepare_midi, path, save_dir, collect_only_metadata)
+                futures.append((path, executor.submit(partial_prepare_midi)))
+            except KeyboardInterrupt:
+                print(' Abort')
+                return
+            except:
+                print(' Error')
+                continue
 
-    results = []
-    for path, future in Bar('Processing').iter(futures):
-        try:
-            results.append(PreparationResult(path, future.result()))
-        except Exception as e:
-            print(f'Could not process file: {path}. Error {e}')
+        batch_results = []
+        for path, future in Bar('Processing').iter(futures):
+            try:
+                batch_results.append(future.result())
+            except Exception as e:
+                print(f'Could not process file: {path}. Error {e}')
 
-    return results
+            metadata = list(map(lambda r: PreparationMetadata(r), batch_results))
+            with open(os.path.join(save_dir, f'metadata_{i}.json'), 'w') as f:
+                print(jsonpickle.encode(metadata, indent=2), file=f)
+
 
 if __name__ == '__main__':
+    #print("Started sleeping at: ", datetime.now())
+    #time.sleep(17600)
+    #print("Ended sleeping at: ", datetime.now())
+
     # preprocess_midi_files_under(
     #         midi_root=sys.argv[1],
     #         save_dir=sys.argv[2],
     #         num_workers=int(sys.argv[3]))
-    result = prepare_midi_files_under(
-        midi_root=r'C:\Repos\EmotionBox\dataset\maestro-v3.0.0\2018',
-        save_dir=r'C:\Users\Dawid\AppData\Local\Temp\music21\piano-2018-transposed',
-        num_workers=6,
-        collect_only_metadata=True
+    midi_root = r'C:\DATA\prep\nes-30s-betterV4'
+    save_dir = r'C:\DATA\prep\nes-30s-betterV4-transposed'
+    prepare_midi_files_under(
+        midi_root=midi_root,
+        save_dir=save_dir,
+        num_workers=12,
+        batch_size=1000,
+        collect_only_metadata=False
     )
-
-    metadata = list(map(lambda r: PreparationMetadata(r), result))
-
-    with open(r'C:\Repos\EmotionBox\dataset\maestro-v3.0.0\2018\metadata.json', 'w') as f:
-        print(jsonpickle.encode(metadata, indent=2, unpicklable=False), file=f)
 
 

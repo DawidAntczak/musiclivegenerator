@@ -1,3 +1,4 @@
+import math
 import os
 import numpy as np
 from sequence import EventSeq, ControlSeq
@@ -61,9 +62,9 @@ def transposition(events, controls, offset=0):
         events[indeces1] += offset + 12
 
     assert ((0 <= events) & (events < EventSeq.dim())).all()
-    histr = ControlSeq.feat_ranges()['pitch_histogram']
-    controls[:, :, histr.start:histr.stop] = np.roll(
-                    controls[:, :, histr.start:histr.stop], offset, -1)
+    moder = ControlSeq.feat_ranges()['mode']
+    controls[:, :, moder.start:moder.stop] = np.roll(
+                    controls[:, :, moder.start:moder.stop], offset, -1)
 
     return events, controls
 
@@ -87,3 +88,4 @@ def compute_gradient_norm(parameters, norm_type=2):
         total_norm += param_norm ** norm_type
     total_norm = total_norm ** (1. / norm_type)
     return total_norm
+

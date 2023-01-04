@@ -23,7 +23,7 @@ class PerformanceRNN(nn.Module):
         self.init_dim = init_dim
         self.hidden_dim = hidden_dim
         self.gru_layers = gru_layers
-        self.concat_dim = event_dim + 1 + control_dim
+        self.concat_dim = event_dim + control_dim
         self.input_dim = hidden_dim
         self.output_dim = event_dim
 
@@ -61,20 +61,14 @@ class PerformanceRNN(nn.Module):
 
     def forward(self, event, control=None, hidden=None):
         # One step forward
-
         assert len(event.shape) == 2
         assert event.shape[0] == 1
         batch_size = event.shape[1]
         event = self.event_embedding(event)      #1*8->1*8*240 word embedding 0-240->240
 
-        if control is None:
-            default = torch.ones(1, batch_size, 1).to(device)
-            control = torch.zeros(1, batch_size, self.control_dim).to(device)
-        else:
-            default = torch.zeros(1, batch_size, 1).to(device)  #1*8(batch_size)*1 all zero
-            assert control.shape == (1, batch_size, self.control_dim) #control 1*8*240
+        assert control.shape == (1, batch_size, self.control_dim)  # control 1*8*240
 
-        concat = torch.cat([event, default, control], -1) #concat 1*8*24  training1*64*265
+        concat = torch.cat([event, control], -1) #concat 1*8*24  training1*64*255
         input = self.concat_input_fc(concat) #concat 1*8*512
         input = self.concat_input_fc_activation(input)
 
@@ -303,7 +297,7 @@ if __name__ == '__main__':
 
     init = torch.randn(64, model.init_dim).to(device)  # 64*32
     events = torch.randn(200, 64).to(device).long()
-    controls = torch.randn(200, 64, 24).to(device)
+    controls = torch.randn(200, 64, 15).to(device)
     outputs = model.generate(init, 200, events=events[:-1], controls=controls,
                              teacher_forcing_ratio=1, output_type='logit')
 

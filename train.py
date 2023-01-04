@@ -27,7 +27,7 @@ from datetime import datetime
 #========================================================================
 
 print("Started sleeping at: ", datetime.now())
-time.sleep(16800)
+#time.sleep(2300)
 print("Ended sleeping at: ", datetime.now())
 
 def get_options():
@@ -41,7 +41,7 @@ def get_options():
     parser.add_option('-d', '--dataset',
                       dest='data_path',
                       type='string',
-                      default='dataset/processed-nes-snes-unique-notes-3')
+                      default='dataset/processed-piano-30s-betterV4-transposed')
 
     parser.add_option('-i', '--saving-interval',
                       dest='saving_interval',
@@ -243,7 +243,7 @@ try:
 
         norm = utils.compute_gradient_norm(model.parameters())
         nn.utils.clip_grad_norm_(model.parameters(), 1.0) #梯度裁剪
-        
+
         optimizer.step()
 
         if enable_logging:
