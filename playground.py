@@ -104,15 +104,19 @@ if __name__ == '__main__':
     #control_seq = ControlSeq.from_event_seq(event_seq, metadata)
     #event_array = event_seq.to_array()
 
-    with open(os.path.join(r'C:\DATA\prep\game-piano-30s-betterV3-transposed', 'metadata.json')) as f:
-        all_metadata = jsonpickle.decode(f.read())
+    metadata_paths = list(utils.find_files_by_extensions(r'C:\DATA\prep\nes-snes-gamepiano-30s-betterV6-transposed', ['.json']))
+    all_metadata = list()
+    for metadata_path in metadata_paths:
+        with open(metadata_path) as f:
+            metadata_part = jsonpickle.decode(f.read())
+            all_metadata.extend(metadata_part)
 
     intervals_tops = get_intervals_tops(all_metadata, 'note_density', 6)
     print(intervals_tops)
-    #intervals_tops = get_intervals_tops(all_metadata, 'avg_pitches_played', 6)
-    #print(intervals_tops)
-    #intervals_tops = get_intervals_tops(all_metadata, 'entropy', 6)
-    #print(intervals_tops)
+    intervals_tops = get_intervals_tops(all_metadata, 'avg_pitches_played', 3)
+    print(intervals_tops)
+    intervals_tops = get_intervals_tops(all_metadata, 'entropy', 3)
+    print(intervals_tops)
     #midi_stream = converter.parse(r'C:\DATA\prep\example\pol2-2-q-speed_00.mid', quantizePost=True)
     #p = str(midi_stream.write('midi'))
     #midi = pretty_midi.PrettyMIDI(p)

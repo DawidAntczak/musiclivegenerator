@@ -40,7 +40,7 @@ def getopt():
     parser.add_option('-s', '--session',
                       dest='sess_path',
                       type='string',
-                      default='save/train.sess',
+                      default='save/train — kopia.sess',
                       help='session file containing the trained model')
 
     parser.add_option('-o', '--output-dir',
@@ -71,7 +71,7 @@ def getopt():
     parser.add_option('-T', '--temperature',
                       dest='temperature',
                       type='float',
-                      default=1.0)
+                      default=1.5)
 
     parser.add_option('-z', '--init-zero',
                       dest='init_zero',
@@ -112,9 +112,9 @@ controls=[]
 name_dict ={'1,0,0': 'happy', '0,1,0':'sad', '0,0,1':'unknown'}
 
 
-for den_num in [1, 5, 10]:
-    for pitches_num in [0, 1, 5]:
-        for entropy in [0, 1, 5]:
+for den_num in [1, 2, 3, 4]:
+    for pitches_num in ['']:
+        for entropy in [0, 1, 2]:
             controls.append(f'1,0,0;{den_num};{pitches_num};{entropy}')
             controls.append(f'0,1,0;{den_num};{pitches_num};{entropy}')
             controls.append(f'0,0,1;{den_num};{pitches_num};{entropy}')
@@ -148,13 +148,26 @@ for control in controls:
                 assert np.all(mode >= 0)
                 mode = mode / mode.sum() \
                     if mode.sum() else np.ones(3) / 3
-            note_density = int(note_density)
-            assert note_density in range(len(ControlSeq.note_density_bins))
-            avg_pitches_count = int(avg_pitches_count)
-            assert avg_pitches_count in range(len(ControlSeq.avg_played_pitches_bins))
-            entropy = int(entropy)
-            assert entropy in range(len(ControlSeq.entropy_bins))
-            control = Control(mode, note_density, avg_pitches_count, entropy)
+
+            if len(note_density) > 0:
+                note_density = int(note_density)
+                assert note_density in range(len(ControlSeq.note_density_bins))
+            else:
+                note_density = (np.ones(len(ControlSeq.note_density_bins)) / len(ControlSeq.note_density_bins)).tolist()
+
+            if len(avg_pitches_count) > 0:
+                avg_pitches_count = int(avg_pitches_count)
+                assert avg_pitches_count in range(len(ControlSeq.avg_played_pitches_bins))
+            else:
+                avg_pitches_count = (np.ones(len(ControlSeq.avg_played_pitches_bins)) / len(ControlSeq.avg_played_pitches_bins)).tolist()
+
+            if len(entropy) > 0:
+                entropy = int(entropy)
+                assert entropy in range(len(ControlSeq.entropy_bins))
+            else:
+                entropy = (np.ones(len(ControlSeq.entropy_bins)) / len(ControlSeq.entropy_bins)).tolist()
+
+            control = Control(mode.tolist(), note_density, avg_pitches_count, entropy)
             controls = torch.tensor(control.to_array(), dtype=torch.float32)
             controls = controls.repeat(1, batch_size, 1).to(device) # 1Xbatch_sizeX controls
             control = repr(control)
@@ -219,7 +232,10 @@ for control in controls:
     os.makedirs(output_dir, exist_ok=True)
 
     for i, output in enumerate(outputs):
-        name = f'output-{i}{control_name}-den_{note_density}-pit_{avg_pitches_count}-ent_{entropy}.mid'
+        name = f'output-{i}{control_name}' \
+               f'-den_{note_density if type(note_density) == int else "x"}' \
+               f'-pit_{avg_pitches_count if type(avg_pitches_count) == int else "x"}' \
+               f'-ent_{entropy if type(entropy) == int else "x"}.mid'
         path = os.path.join(output_dir, name)
         n_notes = utils.event_indeces_to_midi_file(output, path)
         print(f'===> {path} ({n_notes} notes)')

@@ -1,15 +1,12 @@
 import functools
-import math
 import os
 import time
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
-from itertools import islice, chain
 
 import jsonpickle
 import music21
 import muspy
-import numpy as np
 import pretty_midi
 from music21 import *
 
@@ -124,16 +121,12 @@ def prepare_midi_files_under(midi_root, save_dir, num_workers, batch_size=1000, 
 
 
 if __name__ == '__main__':
-    #print("Started sleeping at: ", datetime.now())
-    #time.sleep(17600)
-    #print("Ended sleeping at: ", datetime.now())
+    print("Started sleeping at: ", datetime.now())
+    #time.sleep(10800)
+    print("Ended sleeping at: ", datetime.now())
 
-    # preprocess_midi_files_under(
-    #         midi_root=sys.argv[1],
-    #         save_dir=sys.argv[2],
-    #         num_workers=int(sys.argv[3]))
-    midi_root = r'C:\DATA\prep\nes-30s-betterV4'
-    save_dir = r'C:\DATA\prep\nes-30s-betterV4-transposed'
+    midi_root = r'C:\DATA\prep\maestro-v3.0.0-30s'
+    save_dir = r'C:\DATA\prep\maestro-v3.0.0-30s-transposed'
     prepare_midi_files_under(
         midi_root=midi_root,
         save_dir=save_dir,

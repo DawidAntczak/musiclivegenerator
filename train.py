@@ -41,7 +41,7 @@ def get_options():
     parser.add_option('-d', '--dataset',
                       dest='data_path',
                       type='string',
-                      default='dataset/processed-piano-30s-betterV4-transposed')
+                      default='dataset/all-game-piano-music-30s-transposed-2s-window')
 
     parser.add_option('-i', '--saving-interval',
                       dest='saving_interval',

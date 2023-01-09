@@ -1,7 +1,7 @@
 import functools
 import os
-import re
-import sys
+import time
+from datetime import datetime
 
 import jsonpickle
 import torch
@@ -11,13 +11,12 @@ from concurrent.futures import ProcessPoolExecutor
 
 from sequence import NoteSeq, EventSeq, ControlSeq
 import utils
-import config
 from collections import Counter
 
 
 def preprocess_midi(path, metadata): #midi file->pretty midi(note_seq)->event_seq->control_seq
     note_seq, instr_to_note_count = NoteSeq.from_midi_file(path)
-    #note_seq.trim_overlapped_notes()
+    note_seq.trim_overlapped_notes()
     note_seq.adjust_time(-note_seq.notes[0].start) #把起始时间设置到0
     event_seq = EventSeq.from_note_seq(note_seq)
     control_seq = ControlSeq.from_event_seq(event_seq, metadata)
@@ -38,8 +37,12 @@ def preprocess_midi_files_under(midi_root, save_dir, num_workers):
     entropy_bin_dict = dict()
     instr_to_note_count_dict = dict()
 
-    with open(os.path.join(midi_root, 'metadata.json')) as f:
-        all_metadata = jsonpickle.decode(f.read())
+    metadata_paths = list(utils.find_files_by_extensions(midi_root, ['.json']))
+    all_metadata = list()
+    for metadata_path in metadata_paths:
+        with open(metadata_path) as f:
+            metadata_part = jsonpickle.decode(f.read())
+            all_metadata.extend(metadata_part)
 
     for path in midi_paths:
         try:
@@ -59,7 +62,7 @@ def preprocess_midi_files_under(midi_root, save_dir, num_workers):
         code = hashlib.md5(path.encode()).hexdigest()  # convert path to hashcode
         save_path = os.path.join(save_dir, out_fmt.format(name, code))
         try:
-            (event_seq, control_seq, metadata_seq, instr_to_note_count) = future.result() #event_seq.to_array(), control_seq.to_compressed_array() 组成的元组
+            (event_seq, control_seq, metadata_seq, instr_to_note_count) = future.result()
             torch.save((event_seq, control_seq), save_path)
             for metadata in metadata_seq:
                 c = note_count_dict.get(metadata.note_count, 0)
@@ -78,14 +81,15 @@ def preprocess_midi_files_under(midi_root, save_dir, num_workers):
 
 
 if __name__ == '__main__':
-    # preprocess_midi_files_under(
-    #         midi_root=sys.argv[1],
-    #         save_dir=sys.argv[2],
-    #         num_workers=int(sys.argv[3]))
+    print("Started sleeping at: ", datetime.now())
+    #time.sleep(5400)
+    print("Ended sleeping at: ", datetime.now())
+
     metadata = preprocess_midi_files_under(
-        midi_root=r'C:\DATA\prep\game-piano-30s-betterV3-transposed',
-        save_dir=r'.\dataset\processed-piano-30s-betterV4-transposed',
-        num_workers=6)
+        midi_root=r'C:\DATA\prep\example2-transposed',
+        save_dir=r'.\dataset\example2-transposed',
+        num_workers=12)
+
 
     import json
     import collections

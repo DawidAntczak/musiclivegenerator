@@ -26,7 +26,7 @@ DEFAULT_NORMALIZATION_BASELINE = 60  # C4
 
 # EventSeq ------------------------------------------------------------------------
 
-USE_VELOCITY = False     # TODO co z tym
+USE_VELOCITY = True     # TODO co z tym
 BEAT_LENGTH = 60 / DEFAULT_TEMPO
 DEFAULT_TIME_SHIFT_BINS = 1.15 ** np.arange(32) / 65 #non-linear
 DEFAULT_VELOCITY_STEPS = 32
@@ -35,12 +35,16 @@ MIN_NOTE_LENGTH = BEAT_LENGTH / 2
 
 # ControlSeq ----------------------------------------------------------------------
 
-DEFAULT_WINDOW_SIZE = BEAT_LENGTH * 10
-DEFAULT_NOTE_DENSITY_BINS = np.array([0, 2.372976456934317, 3.100114678640942, 3.7000357206554098, 4.233333333333333, 4.767494356659142, 5.333375279458888, 5.933354973735946, 6.566542750929368, 7.266666666666667, 8.199753494664062, 9.647493060354174])
+QUANTIZE_NOTE_TIMES = True
+DEFAULT_TIME_QUANT = BEAT_LENGTH / 8    # 1/32 s
+
+DEFAULT_WINDOW_SIZE = BEAT_LENGTH * 4
+DEFAULT_NOTE_DENSITY_BINS = np.array([0, 1.6175867768595042, 2.8666666666666667, 4.133333333333334, 5.633333333333334, 8.041379310344828]) * 1.1
 #DEFAULT_NOTE_DENSITY_BINS = np.array([0, 3.100114678640942, 4.233333333333333, 5.333375279458888, 6.566542750929368, 8.199753494664062])
-DEFAULT_AVG_PLAYED_PITCHES_BINS = np.array([0, 1.934601664684899, 2.3142857142857145, 2.720164609053498, 3.123809523809524, 3.755249343832021])
-DEFAULT_ENTROPY_BINS = np.array([0, 3.6675508692179353, 4.009476984703111, 4.238992526908061, 4.453042051652516, 4.677238787382469]) * 0.85
+DEFAULT_AVG_PLAYED_PITCHES_BINS = np.array([0, 1.9161538461538463, 3.0842105263157894]) * 0.7
+DEFAULT_ENTROPY_BINS = np.array([0, 3.1804939280290952, 4.0212409983780782]) * 0.7
 #DEFAULT_NOTE_DENSITY_BINS = np.arange(12) * 3 + 1 #[1 4 7 10 ..]
+
 
 # ==================================================================================
 # Notes
@@ -62,11 +66,6 @@ class NoteSeq:
     def from_midi_file(path, *args, **kwargs):
         midi = PrettyMIDI(path)
         return NoteSeq.from_midi(midi, *args, **kwargs)
-
-    #@staticmethod
-    #def merge(*note_seqs):
-    #    notes = itertools.chain(*[seq.notes for seq in note_seqs])
-    #    return NoteSeq(list(notes))
 
     def __init__(self, notes=[]):
         self.notes = []
@@ -299,30 +298,36 @@ class EventSeq:
 
 class Control:
     def __init__(self, mode, note_density, avg_pitches_played, entropy):
-        self.mode = mode  # list
-        self.note_density = note_density  # int
-        self.avg_pitches_played = avg_pitches_played    # int
-        self.entropy = entropy
+        self.mode = self._ensure_list(mode, 'mode')
+        self.note_density = self._ensure_list(note_density, 'note_density')
+        self.avg_pitches_played = self._ensure_list(avg_pitches_played, 'avg_pitches_played')
+        self.entropy = self._ensure_list(entropy, 'entropy')
+
+    def _ensure_list(self, value, feature_name):
+        dim = ControlSeq.feat_dims()[feature_name]
+
+        if value is None:
+            return (np.ones(dim) / dim).tolist()
+
+        if type(value) == int or type(value) == np.int64:
+            assert 0 <= value < dim
+            vals = np.zeros(dim)
+            vals[value] = 1.
+            return vals.tolist()
+
+        assert type(value) == list and len(value) == dim
+        return value
 
     def __repr__(self):
         return 'Control(mode={}, note_density={}, avg_pitches_played={}, entropy={})'.format(
             self.mode, self.note_density, self.avg_pitches_played, self.entropy)
 
     def to_array(self):
-        feat_dims = ControlSeq.feat_dims()
-
-        ndens = np.zeros([feat_dims['note_density']])
-        ndens[self.note_density] = 1.  # [dens_dim]
-
-        mode = np.array(self.mode)  # [hist_dim]
-
-        npitches = np.zeros([feat_dims['avg_pitches_played']])
-        npitches[self.avg_pitches_played] = 1.  # [pitches_dim]
-
-        nentropy = np.zeros([feat_dims['entropy']])
-        nentropy[self.entropy] = 1.  # [pitches_dim]
-
-        return np.concatenate([ndens, mode, npitches, nentropy], 0)  # [dens_dim + hist_dim + pitches_dim]
+        dens = np.array(self.note_density)
+        mode = np.array(self.mode)
+        pitches = np.array(self.avg_pitches_played)
+        entropy = np.array(self.entropy)
+        return np.concatenate([dens, mode, pitches, entropy], 0)
 
 
 class ControlSeq:
@@ -335,8 +340,6 @@ class ControlSeq:
     def from_event_seq(event_seq, metadata: PreparationMetadata):
         events = list(event_seq.events)
         start, end = 0, 0
-
-        key_mode = np.zeros([3])    # major, minor, unknown
         note_count = 0
 
         controls, metadatas = [], []
@@ -361,33 +364,38 @@ class ControlSeq:
                     note_count += 1.
                 end += 1
 
-            key_mode[_mode_index(metadata)] = 1
+            mode = _mode_index(metadata)
 
             note_count, avg_pitches_played, entropy = ControlSeq.calculate_metrics(events, start, end)
             note_density_bin = max(np.searchsorted(
                 ControlSeq.note_density_bins,
                 note_count / ControlSeq.window_size, side='right') - 1, 0) #note_count->index(density)
 
-            #avg_pitches_played = metadata.avg_pitches_played
-            #avg_pitches_played = metadata.avg_pitches_played
             avg_played_pitches_bin = max(np.searchsorted(
                 ControlSeq.avg_played_pitches_bins,
-                avg_pitches_played, side='right') - 1, 0) #note_count->index(density)
+                avg_pitches_played, side='right') - 1, 0) if avg_pitches_played else None
 
             entropy_bin = max(np.searchsorted(
                 ControlSeq.entropy_bins,
-                entropy, side='right') - 1, 0) #note_count->index(density)
+                entropy, side='right') - 1, 0) if entropy else None
 
-            controls.append(Control(key_mode.tolist(), note_density_bin, avg_played_pitches_bin, entropy_bin))
+            controls.append(Control(mode, note_density_bin, avg_played_pitches_bin, entropy_bin))
 
             metadatas.append(PreprocessMetadata(note_count.__int__(),
-                                                note_density_bin.__int__(),
-                                                avg_played_pitches_bin.__int__(),
-                                                entropy_bin.__int__()
+                                                note_density_bin.__int__() if note_density_bin is not None else -1,
+                                                avg_played_pitches_bin.__int__() if avg_played_pitches_bin is not None else -1,
+                                                entropy_bin.__int__() if entropy_bin is not None else -1
                                                 ))
 
         return ControlSeq(controls, metadatas)
 
+    @staticmethod
+    def _quantized_time(time_to_quantize):
+        if not QUANTIZE_NOTE_TIMES:
+            return time_to_quantize
+
+        quant_times = round(time_to_quantize / DEFAULT_TIME_QUANT)
+        return quant_times * DEFAULT_TIME_QUANT
 
     @staticmethod
     def calculate_metrics(events, window_start, window_end):
@@ -397,12 +405,13 @@ class ControlSeq:
             if i >= window_end:
                 break
             if events[i].type == 'note_on':
-                c = note_on_times.get(events[i].time, 0)
-                note_on_times[events[i].time] = c + 1
+                quantized_time = ControlSeq._quantized_time(events[i].time)
+                c = note_on_times.get(quantized_time, 0)
+                note_on_times[quantized_time] = c + 1
                 pitches.append(events[i].value)
         times = list(note_on_times.values())
         entropy = ControlSeq.pitch_entropy(pitches)
-        return len(note_on_times), mean(times) if times else 0, 0 if math.isnan(entropy) else entropy
+        return len(note_on_times), mean(times) if times else None, None if math.isnan(entropy) else entropy
 
     @staticmethod
     def _entropy(prob):
@@ -445,20 +454,25 @@ class ControlSeq:
     @staticmethod
     def recover_compressed_array(array):
         feat_dims = ControlSeq.feat_dims()
-        assert array.shape[1] == 1 + feat_dims['mode'] + 1 + 1
+        assert array.shape[1] == ControlSeq.dim()
 
-        ndens = np.zeros([array.shape[0], feat_dims['note_density']])
-        ndens[np.arange(array.shape[0]), array[:, 0]] = 1.  # [steps, dens_dim] 把 dens由 int 变成1-hot（12维)
+        start = 0
+        end = feat_dims['note_density']
+        dens = array[:, start:end].astype(np.float64)
 
-        mode = array[:, 1:4].astype(np.float64)  # [steps, hist_dim]
+        start = end
+        end += feat_dims['mode']
+        mode = array[:, start:end].astype(np.float64)
 
-        pitches = np.zeros([array.shape[0], feat_dims['avg_pitches_played']])
-        pitches[np.arange(array.shape[0]), array[:, -2]] = 1.  # [steps, dens_dim] 把 dens由 int 变成1-hot（12维)
+        start = end
+        end += feat_dims['avg_pitches_played']
+        pitches = array[:, start:end].astype(np.float64)
 
-        entropy = np.zeros([array.shape[0], feat_dims['entropy']])
-        entropy[np.arange(array.shape[0]), array[:, -1]] = 1.  # [steps, dens_dim] 把 dens由 int 变成1-hot（12维)
+        start = end
+        end += feat_dims['entropy']
+        entropy = array[:, start:end].astype(np.float64)
 
-        return np.concatenate([ndens, mode, pitches, entropy], 1)  # [steps, dens_dim(12) + mode_dim(3), avg_pitches_dim(6), entropy(6)]
+        return np.concatenate([dens, mode, pitches, entropy], 1)
 
     def __init__(self, controls, metadatas):
         for control in controls:
@@ -468,21 +482,20 @@ class ControlSeq:
         self.controls = copy.deepcopy(controls)
         self.metadatas = metadatas
 
-    def to_compressed_array(self): #control-> [density,p_histogram]
-        ndens = [control.note_density for control in self.controls]
-        ndens = np.array(ndens, dtype=np.uint8).reshape(-1, 1)
-        mode = [control.mode for control in self.controls] # steps*12
-        mode = np.array(mode).astype(np.uint8) # steps*12
+    def to_compressed_array(self):
+        dens = [control.note_density for control in self.controls]
+        dens = np.array(dens).astype(np.uint8)
+        
+        mode = [control.mode for control in self.controls]
+        mode = np.array(mode).astype(np.uint8)
+        
         pitches = [control.avg_pitches_played for control in self.controls]
-        pitches = np.array(pitches, dtype=np.uint8).reshape(-1, 1)
+        pitches = np.array(pitches).astype(np.uint8)
+        
         entropy = [control.entropy for control in self.controls]
-        entropy = np.array(entropy, dtype=np.uint8).reshape(-1, 1)
-        return np.concatenate([
-            ndens,  # [steps, 1] density index
-            mode,  # [steps, mode_dim] 0-255
-            pitches,
-            entropy
-        ], 1)  # [steps, mode_dim(3) + 1]
+        entropy = np.array(entropy).astype(np.uint8)
+        
+        return np.concatenate([dens, mode, pitches, entropy], 1)
 
 
 class PreprocessMetadata:
