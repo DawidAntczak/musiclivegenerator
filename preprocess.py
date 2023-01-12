@@ -86,8 +86,8 @@ if __name__ == '__main__':
     print("Ended sleeping at: ", datetime.now())
 
     metadata = preprocess_midi_files_under(
-        midi_root=r'C:\DATA\prep\example2-transposed',
-        save_dir=r'.\dataset\example2-transposed',
+        midi_root=r'C:\DATA\prep\maestro-v3.0.0-30s-transposed',
+        save_dir=r'.\dataset\maestro-v3.0.0-30s-transposed',
         num_workers=12)
 
 

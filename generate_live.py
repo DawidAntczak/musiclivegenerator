@@ -9,7 +9,6 @@ import time
 import io
 import asyncio
 
-from input import transform
 from output_handler import OutputHandler
 from ws_server import WsServer
 from threading import Thread
@@ -49,7 +48,7 @@ def getopt():
     parser.add_option('-s', '--session',
                       dest='sess_path',
                       type='string',
-                      default='save/train — kopia.sess',
+                      default='save/all-game-piano-music-30s-transposed-2s-window.sess',
                       help='session file containing the trained model')
 
     parser.add_option('-o', '--output-dir',
@@ -80,7 +79,7 @@ def getopt():
     parser.add_option('-T', '--temperature',
                       dest='temperature',
                       type='float',
-                      default=1.0)
+                      default=1.2)
 
     parser.add_option('-z', '--init-zero',
                       dest='init_zero',
@@ -90,12 +89,11 @@ def getopt():
     return parser.parse_args()[0]
 
 
-def run_server(server, stop_server_event):
+def run_server(server):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(server.start())
     loop.run_forever()
-    print("Server stopped")
 
 
 def init(init_zero):
@@ -129,18 +127,6 @@ else:
     beam_size = 'DISABLED'
 
 assert os.path.isfile(sess_path), f'"{sess_path}" is not a file'
-# control_dict={'1,0,1,0,1,1,0,1,0,1,0,1':'C大调','3,0,1,0,1,3,0,3,0,1,0,1':'C大调','2,0,1,0,1,2,0,2,0,1,0,1':'C大调',
-#               '2,0,1,1,0,2,0,2,1,0,1,0':'C小调','3,0,1,1,0,3,0,3,1,0,1,0':'C小调','2,0,1,1,0,2,0,2,1,0,1,0':'C小调',}
-# controls=[';1',';2',';3',';4',';5',';6',';7',';8']
-controls=[]
-name_dict ={'3,0,1,0,1,2,0,2,0,1,0,1;1':'peaceful', '3,0,1,0,1,2,0,2,0,1,0,1;5':'happy',
-             '3,0,1,1,0,2,0,2,1,0,1,0;1':'sad', '3,0,1,1,0,2,0,2,1,0,1,0;5':'tensional'}
-
-for den_num in [1, 5]:
-    # controls.append(f'1,0,1,0,1,1,0,1,0,1,0,1;{den_num}')
-    # controls.append(f'1,0,1,1,0,1,0,1,0,1,1,0;{den_num}')
-    controls.append(f'3,0,1,0,1,2,0,2,0,1,0,1;{den_num}')
-    controls.append(f'3,0,1,1,0,2,0,2,1,0,1,0;{den_num}')
 
 # ------------------------------------------------------------------------
 
@@ -175,8 +161,7 @@ output_handler = OutputHandler()
 listeners_awaiting_start = set()
 server = WsServer(on_start=lambda: listeners_awaiting_start.add(""),
                   on_input_data=output_handler.input_received)
-stop_server_event = threading.Event()
-thread = Thread(target=lambda: run_server(server, stop_server_event))
+thread = Thread(target=lambda: run_server(server))
 thread.start()
 
 output_handler.start(server, model, init, greedy=greedy_ratio, temperature=temperature)
@@ -184,36 +169,4 @@ output_handler.start(server, model, init, greedy=greedy_ratio, temperature=tempe
 while len(listeners_awaiting_start) < 1:    # hacky way to start server and wait for any listener
     pass
 
-input("Listening to input and generating...")
-
-# ========================================================================
-# Generating end
-# ========================================================================
-
-#outputs = model.generate(init, max_len,
-#                         controls=transform(controls[0]),
-#                         greedy=greedy_ratio,
-#                         temperature=temperature,
-#                         verbose=True)
-#outputs = outputs.cpu().numpy().T  # [batch, sample_length(event_num)],T=transport
-
-# ========================================================================
-# Saving
-# ========================================================================
-
-#os.makedirs(output_dir, exist_ok=True)
-#for i, output in enumerate(outputs):
-#    name = f'output-{i}.mid'
-#    path = os.path.join(output_dir, name)
-#    n_notes = utils.event_indeces_to_midi_file(output, path)
-#    print(f'===> {path} ({n_notes} notes)')
-
-    # output_handler.collect_to_midi()
-    # stream = io.BytesIO()
-    # n_notes = utils.event_indeces_to_midi_file(output, stream)
-    # stream.seek(0)
-    # midiBytes = stream.read()
-    # asyncio.run(server.send_data(midiBytes))
-#    print(f'===> Sent {n_notes} notes)')
-stop_server_event.set()     # not working yet but a nice idea, isn't it?
-print("ALL DONE")
+print("Listening to input and generating...")

@@ -1,5 +1,3 @@
-import asyncio
-
 import io
 
 import utils
@@ -28,11 +26,12 @@ class OutputHandler:
     async def input_received(self, raw_input_json):
         input = Input(raw_input_json)
         transformed_input = input.get_transformed()
+        get_requested_event_count = input.get_requested_event_count()
 
         if input.should_reset():
             self.model.init_live_generation(self.init)
 
-        outputs = self.model.generate_live(round(self.collect_every * (input.note_density+1) / 2), controls=transformed_input,
+        outputs = self.model.generate_live(steps=get_requested_event_count, controls=transformed_input,
                                            greedy=self.greedy, temperature=self.temperature)
         await self.send_as_midi(outputs)
 
@@ -41,7 +40,7 @@ class OutputHandler:
         assert len(output) == 1
         output = output[0]
         stream = io.BytesIO()
-        n_notes = utils.event_indeces_to_midi_file(output, stream)
+        utils.event_indeces_to_midi_file(output, stream)
         stream.seek(0)
         midi_bytes = stream.read()
         await self.server.send_data(midi_bytes)

@@ -104,7 +104,7 @@ if __name__ == '__main__':
     #control_seq = ControlSeq.from_event_seq(event_seq, metadata)
     #event_array = event_seq.to_array()
 
-    metadata_paths = list(utils.find_files_by_extensions(r'C:\DATA\prep\nes-snes-gamepiano-30s-betterV6-transposed', ['.json']))
+    metadata_paths = list(utils.find_files_by_extensions(r'C:\DATA\prep\maestro-v3.0.0-30s-transposed', ['.json']))
     all_metadata = list()
     for metadata_path in metadata_paths:
         with open(metadata_path) as f:

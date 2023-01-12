@@ -26,7 +26,7 @@ DEFAULT_NORMALIZATION_BASELINE = 60  # C4
 
 # EventSeq ------------------------------------------------------------------------
 
-USE_VELOCITY = True     # TODO co z tym
+USE_VELOCITY = False     # TODO co z tym
 BEAT_LENGTH = 60 / DEFAULT_TEMPO
 DEFAULT_TIME_SHIFT_BINS = 1.15 ** np.arange(32) / 65 #non-linear
 DEFAULT_VELOCITY_STEPS = 32
@@ -307,26 +307,28 @@ class Control:
         dim = ControlSeq.feat_dims()[feature_name]
 
         if value is None:
-            return (np.ones(dim) / dim).tolist()
+            return np.ones(dim) / dim
 
         if type(value) == int or type(value) == np.int64:
             assert 0 <= value < dim
             vals = np.zeros(dim)
             vals[value] = 1.
-            return vals.tolist()
+            return vals
 
         assert type(value) == list and len(value) == dim
-        return value
+        value = np.array(value)
+        assert np.all(value >= 0)
+        return value / value.sum() if value.sum() else np.ones(dim) / dim
 
     def __repr__(self):
         return 'Control(mode={}, note_density={}, avg_pitches_played={}, entropy={})'.format(
             self.mode, self.note_density, self.avg_pitches_played, self.entropy)
 
     def to_array(self):
-        dens = np.array(self.note_density)
-        mode = np.array(self.mode)
-        pitches = np.array(self.avg_pitches_played)
-        entropy = np.array(self.entropy)
+        dens = self.note_density
+        mode = self.mode
+        pitches = self.avg_pitches_played
+        entropy = self.entropy
         return np.concatenate([dens, mode, pitches, entropy], 0)
 
 

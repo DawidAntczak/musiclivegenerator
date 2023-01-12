@@ -40,7 +40,7 @@ def getopt():
     parser.add_option('-s', '--session',
                       dest='sess_path',
                       type='string',
-                      default='save/train — kopia.sess',
+                      default='save/all-game-piano-music-30s-transposed-2s-window.sess',
                       help='session file containing the trained model')
 
     parser.add_option('-o', '--output-dir',
@@ -113,7 +113,7 @@ name_dict ={'1,0,0': 'happy', '0,1,0':'sad', '0,0,1':'unknown'}
 
 
 for den_num in [1, 2, 3, 4]:
-    for pitches_num in ['']:
+    for pitches_num in [0, 1, 2]:
         for entropy in [0, 1, 2]:
             controls.append(f'1,0,0;{den_num};{pitches_num};{entropy}')
             controls.append(f'0,1,0;{den_num};{pitches_num};{entropy}')
