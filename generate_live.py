@@ -79,7 +79,7 @@ def getopt():
     parser.add_option('-T', '--temperature',
                       dest='temperature',
                       type='float',
-                      default=1.2)
+                      default=1.25)
 
     parser.add_option('-z', '--init-zero',
                       dest='init_zero',

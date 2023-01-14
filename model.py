@@ -270,7 +270,6 @@ class PerformanceRNN(nn.Module):
         else:
             control = None
         outputs = []
-        print(control)
         for _ in range(0, steps):
             output, hidden = self.forward(event, control, hidden)  # generate output for sampling and hiddenlayer for next iter
             self.live_generation_context['event'] = event
