@@ -15,7 +15,7 @@ import utils
 import config
 from data import Dataset
 from model import PerformanceRNN
-from sequence import NoteSeq, EventSeq, ControlSeq
+from sequence import EventSeq, ControlSeq
 import time
 from datetime import datetime
 
@@ -27,7 +27,7 @@ from datetime import datetime
 #========================================================================
 
 print("Started sleeping at: ", datetime.now())
-#time.sleep(2300)
+time.sleep(5400)
 print("Ended sleeping at: ", datetime.now())
 
 def get_options():
@@ -41,7 +41,7 @@ def get_options():
     parser.add_option('-d', '--dataset',
                       dest='data_path',
                       type='string',
-                      default='dataset/all-game-piano-music-30s-transposed-2s-window')
+                      default='dataset/everything-game-30s-transposed-4')
 
     parser.add_option('-i', '--saving-interval',
                       dest='saving_interval',
@@ -214,7 +214,8 @@ if enable_logging:
 
 last_saving_time = time.time()
 loss_function = nn.CrossEntropyLoss()
-
+min_loss = 0.65
+min_loss_iteration = -1
 try:
     batch_gen = dataset.batches(batch_size, window_size, stride_size)
 
@@ -231,12 +232,13 @@ try:
             assert controls.shape[0] == window_size
         else:
             controls = None
-
+        e = events[:-1]
         init = torch.randn(batch_size, model.init_dim).to(device) #64*32 to generate initial hidden layer 再训的效果不好可能是hidden又被初始化了
         outputs = model.generate(init, window_size, events=events[:-1], controls=controls,
                                  teacher_forcing_ratio=teacher_forcing_ratio, output_type='logit') #200X64X240,最后一个event没输入
         assert outputs.shape[:2] == events.shape[:2]  #200X64
-
+        g = outputs.view(-1, event_dim)
+        gg = events.view(-1)
         loss = loss_function(outputs.view(-1, event_dim), events.view(-1)) #event 是240个
         model.zero_grad()
         loss.backward()
@@ -250,11 +252,18 @@ try:
             writer.add_scalar('model/loss', loss.item(), iteration)
             writer.add_scalar('model/norm', norm.item(), iteration)
 
-        print(f'iter {iteration}, loss: {loss.item()}')
-
-        if time.time() - last_saving_time > saving_interval:
+        loss_item = loss.item()
+        if loss_item < min_loss:
+            min_loss = loss_item
             save_model()
             last_saving_time = time.time()
+            min_loss_iteration = iteration
+
+        print(f'iter {iteration}, loss: {loss_item}, min loss: {min_loss}, min loss iteration: {min_loss_iteration}')
+
+        #if time.time() - last_saving_time > saving_interval:
+        #    save_model()
+        #    last_saving_time = time.time()
         print('Trainning done')
 
 except KeyboardInterrupt:

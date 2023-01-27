@@ -2,6 +2,7 @@ import functools
 import os
 import time
 from datetime import datetime
+import faulthandler
 
 import jsonpickle
 import torch
@@ -16,7 +17,7 @@ from collections import Counter
 
 def preprocess_midi(path, metadata): #midi file->pretty midi(note_seq)->event_seq->control_seq
     note_seq, instr_to_note_count = NoteSeq.from_midi_file(path)
-    note_seq.trim_overlapped_notes()
+    #note_seq.trim_overlapped_notes()
     note_seq.adjust_time(-note_seq.notes[0].start) #把起始时间设置到0
     event_seq = EventSeq.from_note_seq(note_seq)
     control_seq = ControlSeq.from_event_seq(event_seq, metadata)
@@ -44,9 +45,11 @@ def preprocess_midi_files_under(midi_root, save_dir, num_workers):
             metadata_part = jsonpickle.decode(f.read())
             all_metadata.extend(metadata_part)
 
+    all_metadata_dict = {metadata.name: metadata for metadata in all_metadata}
+
     for path in midi_paths:
         try:
-            metadata = [x for x in all_metadata if x.name == os.path.basename(path)][0]
+            metadata = all_metadata_dict[os.path.basename(path)]
             partial_preprocess_midi = functools.partial(preprocess_midi, path, metadata)
             results.append((path, executor.submit(partial_preprocess_midi)))
         except KeyboardInterrupt:
@@ -81,14 +84,15 @@ def preprocess_midi_files_under(midi_root, save_dir, num_workers):
 
 
 if __name__ == '__main__':
+    faulthandler.enable()
     print("Started sleeping at: ", datetime.now())
     #time.sleep(5400)
     print("Ended sleeping at: ", datetime.now())
 
     metadata = preprocess_midi_files_under(
-        midi_root=r'C:\DATA\prep\maestro-v3.0.0-30s-transposed',
-        save_dir=r'.\dataset\maestro-v3.0.0-30s-transposed',
-        num_workers=12)
+        midi_root=r'C:\DATA\prep\everything-game-30s-transposed',
+        save_dir=r'.\dataset\everything-game-30s-transposed-5',
+        num_workers=3)
 
 
     import json

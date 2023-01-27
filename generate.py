@@ -40,7 +40,7 @@ def getopt():
     parser.add_option('-s', '--session',
                       dest='sess_path',
                       type='string',
-                      default='save/all-game-piano-music-30s-transposed-2s-window.sess',
+                      default='save/train.sess',
                       help='session file containing the trained model')
 
     parser.add_option('-o', '--output-dir',
@@ -109,15 +109,15 @@ assert os.path.isfile(sess_path), f'"{sess_path}" is not a file'
 #               '2,0,1,1,0,2,0,2,1,0,1,0':'C小调','3,0,1,1,0,3,0,3,1,0,1,0':'C小调','2,0,1,1,0,2,0,2,1,0,1,0':'C小调',}
 # controls=[';1',';2',';3',';4',';5',';6',';7',';8']
 controls=[]
-name_dict ={'1,0,0': 'happy', '0,1,0':'sad', '0,0,1':'unknown'}
+name_dict ={'1,0,0': 'happy', '0,1,0':'sad', '1,1,1':'unspecified'}
 
 
 for den_num in [1, 2, 3, 4]:
-    for pitches_num in [0, 1, 2]:
-        for entropy in [0, 1, 2]:
+    for pitches_num in [0, 1, 2, '']:
+        for entropy in [0, 1, 2, '']:
             controls.append(f'1,0,0;{den_num};{pitches_num};{entropy}')
             controls.append(f'0,1,0;{den_num};{pitches_num};{entropy}')
-            controls.append(f'0,0,1;{den_num};{pitches_num};{entropy}')
+            controls.append(f'1,1,1;{den_num};{pitches_num};{entropy}')
 
 for control in controls:
     mode, note_density, avg_pitches_count, entropy = control.split(';')

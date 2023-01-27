@@ -8,6 +8,9 @@ import numpy as np
 from progress.bar import Bar
 from config import device
 import config
+from sequence import EventSeq
+
+
 # pylint: disable=E1101,E1102
 
 
@@ -263,14 +266,15 @@ class PerformanceRNN(nn.Module):
         self.live_generation_context['event'] = event
         self.live_generation_context['hidden'] = hidden
 
-    def generate_live(self, steps, controls=None, greedy=1.0, temperature=1.0, output_type='index'):
+    def generate_live(self, time_length, controls=None, greedy=1.0, temperature=1.0, output_type='index'):
         event, hidden = self.live_generation_context['event'], self.live_generation_context['hidden']
         if controls is not None:
             control = controls[0].unsqueeze(0)
         else:
             control = None
         outputs = []
-        for _ in range(0, steps):
+        current_time_length = 0
+        while current_time_length < time_length:
             output, hidden = self.forward(event, control, hidden)  # generate output for sampling and hiddenlayer for next iter
             self.live_generation_context['event'] = event
             self.live_generation_context['hidden'] = hidden
@@ -287,7 +291,24 @@ class PerformanceRNN(nn.Module):
             else:
                 assert False
 
+            current_time_length += self.get_time_shift(event)
+
         return torch.cat(outputs, 0)
+
+    def get_current_length(self, outputs):
+        outputs = torch.cat(outputs, 0)
+        output = outputs.cpu().numpy().T
+        assert len(output) == 1
+        output = output[0]
+        _, time = EventSeq.from_array(output)
+        return time
+
+    def get_time_shift(self, event):
+        output = event.cpu().numpy().T
+        assert len(output) == 1
+        output = output[0]
+        _, time = EventSeq.from_array(output)
+        return time
 
 
 if __name__ == '__main__':

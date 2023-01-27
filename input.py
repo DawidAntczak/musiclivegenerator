@@ -7,15 +7,15 @@ from sequence import Control
 class Input:
     mode, attack_density, avg_pitches_played, entropy = None, None, None, None
     reset = False
-    requested_event_count = None
+    requested_time_length = None
 
     def __init__(self, json_input):
-        self.mode = json_input['Mode']
-        self.attack_density = json_input['AttackDensity']
-        self.avg_pitches_played = json_input['AvgPitchesPlayed']
-        self.entropy = json_input['Entropy']
+        self.mode = json_input['Mode'] if 'Mode' in json_input else None
+        self.attack_density = json_input['AttackDensity'] if 'AttackDensity' in json_input else None
+        self.avg_pitches_played = json_input['AvgPitchesPlayed'] if 'AvgPitchesPlayed' in json_input else None
+        self.entropy = json_input['Entropy'] if 'Entropy' in json_input else None
         self.reset = json_input['Reset']
-        self.requested_event_count = json_input['RequestedEventCount'] if 'RequestedEventCount' in json_input else None
+        self.requested_time_length = json_input['RequestedTimeLength'] if 'RequestedTimeLength' in json_input else 5
 
     def get_transformed(self):
         control = Control(self.mode, self.attack_density, self.avg_pitches_played, self.entropy)
@@ -26,5 +26,5 @@ class Input:
     def should_reset(self):
         return self.reset
 
-    def get_requested_event_count(self):
-        return self.requested_event_count if not None else 50
+    def get_requested_time_length(self):
+        return self.requested_time_length

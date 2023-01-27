@@ -28,9 +28,9 @@ def find_files_by_extensions(root, exts=[], emotion_label=False):
                     yield os.path.join(path, name)
 
 def event_indeces_to_midi_file(event_indeces, midi_file_name, velocity_scale=0.8):
-    event_seq = EventSeq.from_array(event_indeces) # event number->events
+    event_seq, _ = EventSeq.from_array(event_indeces) # event number->events
     note_seq = event_seq.to_note_seq() #events-> prettymidi Notes
-    note_seq.trim_overlapped_notes()
+    #note_seq.trim_overlapped_notes()
     for note in note_seq.notes:
         note.velocity = int((note.velocity - 64) * velocity_scale + 64) #unnormalize velocity
     note_seq.to_midi_file(midi_file_name) #prettymidi ->midi

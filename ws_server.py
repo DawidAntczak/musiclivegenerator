@@ -66,10 +66,7 @@ class WsServer:
         return 'Message' in message and message['Message'] == 'STOP'
 
     def is_input_data_message(self, message):
-        return 'Mode' in message \
-               and 'AttackDensity' in message \
-               and 'AvgPitchesPlayed' in message \
-               and 'Entropy' in message
+        return 'Reset' in message
 
 
 if __name__ == '__main__':

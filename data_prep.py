@@ -88,9 +88,9 @@ def batcher(x, bs):
 
 
 def prepare_midi_files_under(midi_root, save_dir, num_workers, batch_size=1000, collect_only_metadata=False):
-    midi_paths = list(filter(lambda x: '-speed_00' in x, utils.find_files_by_extensions(midi_root, ['.mid', '.midi'])))
+    #midi_paths = list(filter(lambda x: '-speed_00' in x, utils.find_files_by_extensions(midi_root, ['.mid', '.midi'])))
     #midi_paths = list(filter(lambda x: '-speed_00' in x or '-speed_01' in x or '-speed_03' in x, utils.find_files_by_extensions(midi_root, ['.mid', '.midi'])))
-    #midi_paths = list(utils.find_files_by_extensions(midi_root, ['.mid', '.midi']))
+    midi_paths = list(utils.find_files_by_extensions(midi_root, ['.mid', '.midi']))
     os.makedirs(save_dir, exist_ok=True)
 
     executor = ProcessPoolExecutor(num_workers)
@@ -125,13 +125,13 @@ if __name__ == '__main__':
     #time.sleep(10800)
     print("Ended sleeping at: ", datetime.now())
 
-    midi_root = r'C:\DATA\prep\maestro-v3.0.0-30s'
-    save_dir = r'C:\DATA\prep\maestro-v3.0.0-30s-transposed'
+    midi_root = r'C:\DATA\prep\all-game-piano-music-30s-2'
+    save_dir = r'C:\DATA\prep\all-game-piano-music-30s-2-transposed'
     prepare_midi_files_under(
         midi_root=midi_root,
         save_dir=save_dir,
         num_workers=12,
-        batch_size=1000,
+        batch_size=2000,
         collect_only_metadata=False
     )
 

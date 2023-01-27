@@ -30,7 +30,7 @@ USE_VELOCITY = False     # TODO co z tym
 BEAT_LENGTH = 60 / DEFAULT_TEMPO
 DEFAULT_TIME_SHIFT_BINS = 1.15 ** np.arange(32) / 65 #non-linear
 DEFAULT_VELOCITY_STEPS = 32
-DEFAULT_NOTE_LENGTH = BEAT_LENGTH / 2
+DEFAULT_NOTE_LENGTH = BEAT_LENGTH * 2
 MIN_NOTE_LENGTH = BEAT_LENGTH / 2
 
 # ControlSeq ----------------------------------------------------------------------
@@ -39,10 +39,10 @@ QUANTIZE_NOTE_TIMES = True
 DEFAULT_TIME_QUANT = BEAT_LENGTH / 8    # 1/32 s
 
 DEFAULT_WINDOW_SIZE = BEAT_LENGTH * 4
-DEFAULT_NOTE_DENSITY_BINS = np.array([0, 1.6175867768595042, 2.8666666666666667, 4.133333333333334, 5.633333333333334, 8.041379310344828]) * 1.1
+DEFAULT_NOTE_DENSITY_BINS = np.array([0, 2.2175867768595042, 3.1166666666666667, 4.283333333333334, 5.47333333333334, 7.725]) * 1.1
 #DEFAULT_NOTE_DENSITY_BINS = np.array([0, 3.100114678640942, 4.233333333333333, 5.333375279458888, 6.566542750929368, 8.199753494664062])
-DEFAULT_AVG_PLAYED_PITCHES_BINS = np.array([0, 1.9161538461538463, 3.0842105263157894]) * 0.7
-DEFAULT_ENTROPY_BINS = np.array([0, 3.1804939280290952, 4.0212409983780782]) * 0.7
+DEFAULT_AVG_PLAYED_PITCHES_BINS = np.array([0, 2.0, 3.0]) * 0.75
+DEFAULT_ENTROPY_BINS = np.array([0, 3.1354939280290952, 4.1312409983780782]) * 0.715
 #DEFAULT_NOTE_DENSITY_BINS = np.arange(12) * 3 + 1 #[1 4 7 10 ..]
 
 
@@ -201,7 +201,7 @@ class EventSeq:
                         time += EventSeq.time_shift_bins[event_value]
                     break
 
-        return EventSeq(events)
+        return EventSeq(events), time
 
     @staticmethod
     def dim():
@@ -279,7 +279,7 @@ class EventSeq:
 
         for note in notes:
             if note.end is None:
-                note.end = note.start + DEFAULT_NOTE_LENGTH  # if note do not have an end, end it after 0.25s.
+                note.end = note.start - 1  # if note do not have an end, make it invalid.
 
             note.velocity = int(note.velocity)
 
@@ -375,11 +375,11 @@ class ControlSeq:
 
             avg_played_pitches_bin = max(np.searchsorted(
                 ControlSeq.avg_played_pitches_bins,
-                avg_pitches_played, side='right') - 1, 0) if avg_pitches_played else None
+                avg_pitches_played, side='right') - 1, 0) if avg_pitches_played else 0
 
             entropy_bin = max(np.searchsorted(
                 ControlSeq.entropy_bins,
-                entropy, side='right') - 1, 0) if entropy else None
+                entropy, side='right') - 1, 0) if entropy else 0
 
             controls.append(Control(mode, note_density_bin, avg_played_pitches_bin, entropy_bin))
 
@@ -413,7 +413,7 @@ class ControlSeq:
                 pitches.append(events[i].value)
         times = list(note_on_times.values())
         entropy = ControlSeq.pitch_entropy(pitches)
-        return len(note_on_times), mean(times) if times else None, None if math.isnan(entropy) else entropy
+        return len(note_on_times), mean(times) if times else 0, 0 if math.isnan(entropy) else entropy
 
     @staticmethod
     def _entropy(prob):
