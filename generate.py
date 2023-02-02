@@ -35,12 +35,12 @@ def getopt():
     parser.add_option('-b', '--batch-size',
                       dest='batch_size',
                       type='int',
-                      default=8)
+                      default=2)
 
     parser.add_option('-s', '--session',
                       dest='sess_path',
                       type='string',
-                      default='save/train.sess',
+                      default='save/everything-game-30s-transposed-4.sess',
                       help='session file containing the trained model')
 
     parser.add_option('-o', '--output-dir',
@@ -71,7 +71,7 @@ def getopt():
     parser.add_option('-T', '--temperature',
                       dest='temperature',
                       type='float',
-                      default=1.5)
+                      default=1.25)
 
     parser.add_option('-z', '--init-zero',
                       dest='init_zero',

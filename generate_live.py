@@ -48,7 +48,7 @@ def getopt():
     parser.add_option('-s', '--session',
                       dest='sess_path',
                       type='string',
-                      default='save/all-game-piano-music-30s-transposed-2s-window.sess',
+                      default='save/everything-game-30s-transposed-4.sess',
                       help='session file containing the trained model')
 
     parser.add_option('-o', '--output-dir',
