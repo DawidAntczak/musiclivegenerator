@@ -1,13 +1,9 @@
 import torch
 from torch import nn
 from torch import optim
-from torch.autograd import Variable
 
 import numpy as np
 
-import os
-import sys
-import time
 import optparse
 
 
@@ -26,9 +22,11 @@ from datetime import datetime
 # Settings
 #========================================================================
 
-print("Started sleeping at: ", datetime.now())
-time.sleep(5400)
-print("Ended sleeping at: ", datetime.now())
+# if you want to run after some time
+# print("Started sleeping at: ", datetime.now())
+# time.sleep(3600)
+# print("Ended sleeping at: ", datetime.now())
+
 
 def get_options():
     parser = optparse.OptionParser()
@@ -173,6 +171,7 @@ def load_session():
             optimizer.load_state_dict(optimizer_state)
     return model, optimizer
 
+
 def load_dataset():
     global data_path
     dataset = Dataset(data_path, verbose=True)
@@ -195,6 +194,7 @@ print('-' * 70)
 
 #------------------------------------------------------------------------
 
+
 def save_model():
     global model, optimizer, model_config, sess_path
     print('Saving to', sess_path)
@@ -214,37 +214,37 @@ if enable_logging:
 
 last_saving_time = time.time()
 loss_function = nn.CrossEntropyLoss()
-min_loss = 0.65
+min_loss = 999999
 min_loss_iteration = -1
 try:
     batch_gen = dataset.batches(batch_size, window_size, stride_size)
 
-    for iteration, (events, controls) in enumerate(batch_gen):  #训练多少轮和数据量有关系
+    for iteration, (events, controls) in enumerate(batch_gen):
         if use_transposition:
             offset = np.random.choice(np.arange(-6, 6))
             events, controls = utils.transposition(events, controls, offset)
 
-        events = torch.LongTensor(events).to(device) #200X64(timestep * batch_size) input
+        events = torch.LongTensor(events).to(device)
         assert events.shape[0] == window_size
 
         if np.random.random() < control_ratio:
-            controls = torch.FloatTensor(controls).to(device)#200X64X24
+            controls = torch.FloatTensor(controls).to(device)
             assert controls.shape[0] == window_size
         else:
             controls = None
         e = events[:-1]
-        init = torch.randn(batch_size, model.init_dim).to(device) #64*32 to generate initial hidden layer 再训的效果不好可能是hidden又被初始化了
+        init = torch.randn(batch_size, model.init_dim).to(device)
         outputs = model.generate(init, window_size, events=events[:-1], controls=controls,
-                                 teacher_forcing_ratio=teacher_forcing_ratio, output_type='logit') #200X64X240,最后一个event没输入
-        assert outputs.shape[:2] == events.shape[:2]  #200X64
+                                 teacher_forcing_ratio=teacher_forcing_ratio, output_type='logit')
+        assert outputs.shape[:2] == events.shape[:2]
         g = outputs.view(-1, event_dim)
         gg = events.view(-1)
-        loss = loss_function(outputs.view(-1, event_dim), events.view(-1)) #event 是240个
+        loss = loss_function(outputs.view(-1, event_dim), events.view(-1))
         model.zero_grad()
         loss.backward()
 
         norm = utils.compute_gradient_norm(model.parameters())
-        nn.utils.clip_grad_norm_(model.parameters(), 1.0) #梯度裁剪
+        nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
         optimizer.step()
 
@@ -255,16 +255,14 @@ try:
         loss_item = loss.item()
         if loss_item < min_loss:
             min_loss = loss_item
-            save_model()
-            last_saving_time = time.time()
             min_loss_iteration = iteration
 
         print(f'iter {iteration}, loss: {loss_item}, min loss: {min_loss}, min loss iteration: {min_loss_iteration}')
 
-        #if time.time() - last_saving_time > saving_interval:
-        #    save_model()
-        #    last_saving_time = time.time()
-        print('Trainning done')
+        if time.time() - last_saving_time > saving_interval:
+            save_model()
+            last_saving_time = time.time()
+        print('Training done')
 
 except KeyboardInterrupt:
     save_model()

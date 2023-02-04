@@ -1,12 +1,13 @@
-import math
 import os
 import numpy as np
 from sequence import EventSeq, ControlSeq
+
 
 def one_hot(i, nb_classes):
     arr = np.zeros((nb_classes,))
     arr[i] = 1
     return arr
+
 
 def find_files_by_extensions(root, exts=[], emotion_label=False):
     def _has_ext(name):
@@ -27,19 +28,18 @@ def find_files_by_extensions(root, exts=[], emotion_label=False):
                 else:
                     yield os.path.join(path, name)
 
+
 def event_indeces_to_midi_file(event_indeces, midi_file_name, velocity_scale=0.8):
-    event_seq, _ = EventSeq.from_array(event_indeces) # event number->events
-    note_seq = event_seq.to_note_seq() #events-> prettymidi Notes
-    #note_seq.trim_overlapped_notes()
+    event_seq, _ = EventSeq.from_array(event_indeces)
+    note_seq = event_seq.to_note_seq()
+
     for note in note_seq.notes:
-        note.velocity = int((note.velocity - 64) * velocity_scale + 64) #unnormalize velocity
-    note_seq.to_midi_file(midi_file_name) #prettymidi ->midi
+        note.velocity = int((note.velocity - 64) * velocity_scale + 64)
+    note_seq.to_midi_file(midi_file_name)
     return len(note_seq.notes)
 
-def transposition(events, controls, offset=0):
-    # events [steps, batch_size, event_dim]
-    # return events, controls
 
+def transposition(events, controls, offset=0):
     events = np.array(events, dtype=np.int64)
     controls = np.array(controls, dtype=np.float32)
     event_feat_ranges = EventSeq.feat_ranges()
@@ -69,8 +69,10 @@ def transposition(events, controls, offset=0):
 
     return events, controls
 
+
 def dict2params(d, f=','):
     return f.join(f'{k}={v}' for k, v in d.items())
+
 
 def params2dict(p, f=',', e='='):
     d = {}
@@ -81,6 +83,7 @@ def params2dict(p, f=',', e='='):
         k, *v = item
         d[k] = eval('='.join(v))
     return d
+
 
 def compute_gradient_norm(parameters, norm_type=2):
     total_norm = 0

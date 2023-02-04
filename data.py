@@ -1,12 +1,10 @@
-import os
 import torch
-import itertools, os
+import os
 import numpy as np
 from progress.bar import Bar
 
-import config
 import utils
-from sequence import EventSeq, ControlSeq
+from sequence import ControlSeq
 
 
 # pylint: disable=E1101

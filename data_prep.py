@@ -13,7 +13,7 @@ from music21 import *
 from progress.bar import Bar
 
 import utils
-from models import PreparationMetadata
+from preparation_metadata import PreparationMetadata
 
 
 class PreparationResult:
@@ -48,7 +48,7 @@ def transpose(mid, semitones):
     if semitones == 0:
         return
     for inst in mid.instruments:
-        if not inst.is_drum:    # Don't transpose drum tracks
+        if not inst.is_drum:
             for note in inst.notes:
                 note.pitch += semitones
 
@@ -68,19 +68,12 @@ def prepare_midi(path, save_dir, collect_only_metadata=False):
 
     entropy = muspy.metrics.pitch_entropy(muspy_music).__float__()
 
-    #fe = music21.features.jSymbolic.PitchClassDistributionFeature(midi_stream)
-    #pitch_class_distribution_std_dev = np.std(fe.extract().vector).__float__()
-
     fe = music21.features.jSymbolic.NoteDensityFeature(midi_stream)
     note_density = fe.extract().vector[0]
 
-    #fe = music21.features.jSymbolic.AverageTimeBetweenAttacksFeature(midi_stream)
-    #avg_time_between_attacks = fe.extract().vector[0]
-
     avg_pitches_played = muspy.metrics.polyphony(muspy_music).__float__()
 
-    return PreparationResult(path, key_analyze, entropy, 0, note_density,
-                      0, avg_pitches_played)
+    return PreparationResult(path, key_analyze, entropy, 0, note_density, 0, avg_pitches_played)
 
 
 def batcher(x, bs):
@@ -89,7 +82,6 @@ def batcher(x, bs):
 
 def prepare_midi_files_under(midi_root, save_dir, num_workers, batch_size=1000, collect_only_metadata=False):
     #midi_paths = list(filter(lambda x: '-speed_00' in x, utils.find_files_by_extensions(midi_root, ['.mid', '.midi'])))
-    #midi_paths = list(filter(lambda x: '-speed_00' in x or '-speed_01' in x or '-speed_03' in x, utils.find_files_by_extensions(midi_root, ['.mid', '.midi'])))
     midi_paths = list(utils.find_files_by_extensions(midi_root, ['.mid', '.midi']))
     os.makedirs(save_dir, exist_ok=True)
 
@@ -121,12 +113,13 @@ def prepare_midi_files_under(midi_root, save_dir, num_workers, batch_size=1000, 
 
 
 if __name__ == '__main__':
-    print("Started sleeping at: ", datetime.now())
-    #time.sleep(10800)
-    print("Ended sleeping at: ", datetime.now())
+    # if you want to run after some time
+    # print("Started sleeping at: ", datetime.now())
+    # time.sleep(3600)
+    # print("Ended sleeping at: ", datetime.now())
 
-    midi_root = r'C:\DATA\prep\all-game-piano-music-30s-2'
-    save_dir = r'C:\DATA\prep\all-game-piano-music-30s-2-transposed'
+    midi_root = r''     # input
+    save_dir = r''      # output
     prepare_midi_files_under(
         midi_root=midi_root,
         save_dir=save_dir,

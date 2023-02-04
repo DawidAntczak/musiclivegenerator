@@ -18,7 +18,7 @@ import csv
 from progress.bar import Bar
 
 import utils
-from models import PreparationMetadata
+from preparation_metadata import PreparationMetadata
 from sequence import NoteSeq, EventSeq, ControlSeq
 
 
@@ -121,3 +121,29 @@ if __name__ == '__main__':
     #p = str(midi_stream.write('midi'))
     #midi = pretty_midi.PrettyMIDI(p)
     #print(torch.version.cuda)
+
+
+
+if __name__ == '__main__':
+    import pickle
+    import sys
+    path = sys.argv[1] if len(sys.argv) > 1 else 'dataset/midi/ecomp/BLINOV02.mid'
+
+    print('Converting MIDI to EventSeq')
+    es, _ = EventSeq.from_note_seq(NoteSeq.from_midi_file(path))
+
+    print('Converting EventSeq to MIDI')
+    EventSeq.from_array(es.to_array()).to_note_seq().to_midi_file('/tmp/test.mid')
+
+    print('Converting EventSeq to ControlSeq')
+    cs = ControlSeq.from_event_seq(es)
+
+    print('Saving compressed ControlSeq')
+    pickle.dump(cs.to_compressed_array(), open('/tmp/cs-compressed.data', 'wb'))
+
+    print('Loading compressed ControlSeq')
+    c = ControlSeq.recover_compressed_array(
+        pickle.load(open('/tmp/cs-compressed.data', 'rb')))
+
+    print('Done')
+

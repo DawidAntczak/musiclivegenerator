@@ -1,4 +1,6 @@
+import collections
 import functools
+import json
 import os
 import time
 from datetime import datetime
@@ -15,10 +17,9 @@ import utils
 from collections import Counter
 
 
-def preprocess_midi(path, metadata): #midi file->pretty midi(note_seq)->event_seq->control_seq
+def preprocess_midi(path, metadata):
     note_seq, instr_to_note_count = NoteSeq.from_midi_file(path)
-    #note_seq.trim_overlapped_notes()
-    note_seq.adjust_time(-note_seq.notes[0].start) #把起始时间设置到0
+    note_seq.adjust_time(-note_seq.notes[0].start)
     event_seq = EventSeq.from_note_seq(note_seq)
     control_seq = ControlSeq.from_event_seq(event_seq, metadata)
     event_array = event_seq.to_array()
@@ -85,18 +86,18 @@ def preprocess_midi_files_under(midi_root, save_dir, num_workers):
 
 if __name__ == '__main__':
     faulthandler.enable()
-    print("Started sleeping at: ", datetime.now())
-    #time.sleep(5400)
-    print("Ended sleeping at: ", datetime.now())
+
+    # if you want to run after some time
+    # print("Started sleeping at: ", datetime.now())
+    # time.sleep(3600)
+    # print("Ended sleeping at: ", datetime.now())
 
     metadata = preprocess_midi_files_under(
-        midi_root=r'C:\DATA\prep\everything-game-30s-transposed',
-        save_dir=r'.\dataset\everything-game-30s-transposed-5',
-        num_workers=3)
+        midi_root=r'',  # input
+        save_dir=r'',   # output
+        num_workers=4)
 
 
-    import json
-    import collections
     print('\nNote counts:')
     print(json.dumps(collections.OrderedDict(sorted(metadata[0].items())), indent=2))
     print('\nNote density bins:')
@@ -108,8 +109,3 @@ if __name__ == '__main__':
     print('\nInstrument to note count (not working properly)')
     print(json.dumps(collections.OrderedDict(sorted(map(lambda kv: (kv[0].__int__(), kv[1].__int__()), metadata[4].items()))), indent=2))
     print('\nDONE')
-
-    # python3
-    # preprocess.
-    # dataset / midi / NAME
-    # dataset / processed / NAME

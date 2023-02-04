@@ -7,7 +7,7 @@ import collections
 from statistics import mean
 from pretty_midi import PrettyMIDI, Note, Instrument
 
-from models import PreparationMetadata
+from preparation_metadata import PreparationMetadata
 
 # ==================================================================================
 # Parameters
@@ -26,9 +26,9 @@ DEFAULT_NORMALIZATION_BASELINE = 60  # C4
 
 # EventSeq ------------------------------------------------------------------------
 
-USE_VELOCITY = False     # TODO co z tym
+USE_VELOCITY = False
 BEAT_LENGTH = 60 / DEFAULT_TEMPO
-DEFAULT_TIME_SHIFT_BINS = 1.15 ** np.arange(32) / 65 #non-linear
+DEFAULT_TIME_SHIFT_BINS = 1.15 ** np.arange(32) / 65    # non-linear
 DEFAULT_VELOCITY_STEPS = 32
 DEFAULT_NOTE_LENGTH = BEAT_LENGTH * 2
 MIN_NOTE_LENGTH = BEAT_LENGTH / 2
@@ -39,11 +39,11 @@ QUANTIZE_NOTE_TIMES = True
 DEFAULT_TIME_QUANT = BEAT_LENGTH / 8    # 1/32 s
 
 DEFAULT_WINDOW_SIZE = BEAT_LENGTH * 4
+
+# bins adjusted by tests
 DEFAULT_NOTE_DENSITY_BINS = np.array([0, 2.2175867768595042, 3.1166666666666667, 4.283333333333334, 5.47333333333334, 7.725]) * 1.1
-#DEFAULT_NOTE_DENSITY_BINS = np.array([0, 3.100114678640942, 4.233333333333333, 5.333375279458888, 6.566542750929368, 8.199753494664062])
 DEFAULT_AVG_PLAYED_PITCHES_BINS = np.array([0, 2.0, 3.0]) * 0.75
 DEFAULT_ENTROPY_BINS = np.array([0, 3.1354939280290952, 4.1312409983780782]) * 0.715
-#DEFAULT_NOTE_DENSITY_BINS = np.arange(12) * 3 + 1 #[1 4 7 10 ..]
 
 
 # ==================================================================================
@@ -149,7 +149,7 @@ class EventSeq:
     time_shift_bins = DEFAULT_TIME_SHIFT_BINS
 
     @staticmethod
-    def from_note_seq(note_seq): #从note sequence -> performance
+    def from_note_seq(note_seq):
         note_events = []
 
         if USE_VELOCITY:
@@ -161,17 +161,17 @@ class EventSeq:
                     velocity = note.velocity
                     velocity = max(velocity, EventSeq.velocity_range.start)
                     velocity = min(velocity, EventSeq.velocity_range.stop - 1)
-                    velocity_index = np.searchsorted(velocity_bins, velocity)  # velocity-> velocity index
-                    note_events.append(Event('velocity', note.start, velocity_index)) # 记录时间和velocity index
+                    velocity_index = np.searchsorted(velocity_bins, velocity)
+                    note_events.append(Event('velocity', note.start, velocity_index))
 
-                pitch_index = note.pitch - EventSeq.pitch_range.start  # index=pitch-pitch_min_range
+                pitch_index = note.pitch - EventSeq.pitch_range.start
                 note_events.append(Event('note_on', note.start, pitch_index))
                 note_events.append(Event('note_off', note.end, pitch_index))
 
-        note_events.sort(key=lambda event: event.time)  # stable sort events by time
+        note_events.sort(key=lambda event: event.time)
         events = []
 
-        for i, event in enumerate(note_events): # caculate timeshift event
+        for i, event in enumerate(note_events):
             events.append(event)
 
             if event is note_events[-1]:
@@ -182,14 +182,14 @@ class EventSeq:
 
             while interval - shift >= EventSeq.time_shift_bins[0]:
                 index = np.searchsorted(EventSeq.time_shift_bins,
-                                        interval - shift, side='right') - 1  # time shift-> time shift index 时间精度不够就使用多个timeshift events
+                                        interval - shift, side='right') - 1
                 events.append(Event('time_shift', event.time + shift, index))
                 shift += EventSeq.time_shift_bins[index]
 
         return EventSeq(events)
 
     @staticmethod
-    def from_array(event_indeces):  # event num->events
+    def from_array(event_indeces):
         time = 0
         events = []
         for event_index in event_indeces:
@@ -218,10 +218,10 @@ class EventSeq:
         return feat_dims
 
     @staticmethod
-    def feat_ranges():  #return a dict {on:0-87,0ff:88-175,velocity:176-207,timeshift:208-240 }
+    def feat_ranges():
         offset = 0
         feat_ranges = collections.OrderedDict()
-        for feat_name, feat_dim in EventSeq.feat_dims().items(): # EventSeq.feat_dims() is a order_dict
+        for feat_name, feat_dim in EventSeq.feat_dims().items():
             feat_ranges[feat_name] = range(offset, offset + feat_dim)
             offset += feat_dim
         return feat_ranges
@@ -239,14 +239,13 @@ class EventSeq:
 
         self.events = copy.deepcopy(events)
 
-        # compute event times again
         time = 0
         for event in self.events:
             event.time = time
             if event.type == 'time_shift':
                 time += EventSeq.time_shift_bins[event.value]
 
-    def to_note_seq(self): #events-> prettymidi Notes
+    def to_note_seq(self):
         time = 0
         notes = []
 
@@ -279,7 +278,7 @@ class EventSeq:
 
         for note in notes:
             if note.end is None:
-                note.end = note.start - 1  # if note do not have an end, make it invalid.
+                note.end = note.start - 1
 
             note.velocity = int(note.velocity)
 
@@ -354,13 +353,13 @@ class ControlSeq:
             return 0
 
         for i, event in enumerate(events):
-            while start < i:  #扣除窗左边的音符
+            while start < i:
                 if events[start].type == 'note_on':
                     note_count -= 1.
                 start += 1
 
-            while end < len(events): #添加窗左边的音符
-                if events[end].time - event.time > ControlSeq.window_size: #在window_size的时间窗内
+            while end < len(events):
+                if events[end].time - event.time > ControlSeq.window_size:
                     break
                 if events[end].type == 'note_on':
                     note_count += 1.
@@ -371,7 +370,7 @@ class ControlSeq:
             note_count, avg_pitches_played, entropy = ControlSeq.calculate_metrics(events, start, end)
             note_density_bin = max(np.searchsorted(
                 ControlSeq.note_density_bins,
-                note_count / ControlSeq.window_size, side='right') - 1, 0) #note_count->index(density)
+                note_count / ControlSeq.window_size, side='right') - 1, 0)
 
             avg_played_pitches_bin = max(np.searchsorted(
                 ControlSeq.avg_played_pitches_bins,
@@ -506,27 +505,3 @@ class PreprocessMetadata:
         self.density_bin = density_bin
         self.avg_pitches_played_bin = avg_pitches_played_bin
         self.entropy_bin = entropy_bin
-
-
-if __name__ == '__main__':
-    import pickle
-    import sys
-    path = sys.argv[1] if len(sys.argv) > 1 else 'dataset/midi/ecomp/BLINOV02.mid'
-
-    print('Converting MIDI to EventSeq')
-    es, _ = EventSeq.from_note_seq(NoteSeq.from_midi_file(path))
-
-    print('Converting EventSeq to MIDI')
-    EventSeq.from_array(es.to_array()).to_note_seq().to_midi_file('/tmp/test.mid')
-
-    print('Converting EventSeq to ControlSeq')
-    cs = ControlSeq.from_event_seq(es)
-
-    print('Saving compressed ControlSeq')
-    pickle.dump(cs.to_compressed_array(), open('/tmp/cs-compressed.data', 'wb'))
-
-    print('Loading compressed ControlSeq')
-    c = ControlSeq.recover_compressed_array(
-        pickle.load(open('/tmp/cs-compressed.data', 'rb')))
-
-    print('Done')

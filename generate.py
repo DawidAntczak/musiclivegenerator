@@ -1,15 +1,13 @@
 import torch
 import numpy as np
 import os
-import sys
 import optparse
 import time
 
-import config
 import utils
-from config import device, model as model_config
+from config import device
 from model import PerformanceRNN
-from sequence import EventSeq, Control, ControlSeq
+from sequence import Control, ControlSeq
 
 # pylint: disable=E1101,E1102
 
@@ -21,17 +19,6 @@ from sequence import EventSeq, Control, ControlSeq
 def getopt():
     parser = optparse.OptionParser()
 
-    parser.add_option('-c', '--control',
-                      dest='control',
-                      type='string',
-                      default=None,
-                      help=('control or a processed data file path, '
-                            'e.g., "PITCH_HISTOGRAM;NOTE_DENSITY" like '
-                            '"2,0,1,1,0,1,0,1,1,0,0,1;4", or '
-                            '";3" (which gives all pitches the same probability), '
-                            'or "/path/to/processed/midi/file.data" '
-                            '(uses control sequence from the given processed data)'))
-
     parser.add_option('-b', '--batch-size',
                       dest='batch_size',
                       type='int',
@@ -40,7 +27,7 @@ def getopt():
     parser.add_option('-s', '--session',
                       dest='sess_path',
                       type='string',
-                      default='save/everything-game-30s-transposed-4.sess',
+                      default='save/everything-game-30s-transposed.sess',
                       help='session file containing the trained model')
 
     parser.add_option('-o', '--output-dir',
@@ -71,7 +58,7 @@ def getopt():
     parser.add_option('-T', '--temperature',
                       dest='temperature',
                       type='float',
-                      default=1.25)
+                      default=1.0)
 
     parser.add_option('-z', '--init-zero',
                       dest='init_zero',
@@ -90,9 +77,7 @@ output_dir=output_dir+'/'+time.strftime("%Y-%m-%d %H-%M-%S", time.localtime())
 sess_path = opt.sess_path
 batch_size = opt.batch_size
 max_len = opt.max_len
-# greedy_ratio = opt.greedy_ratio  调greedy可以避免一直重复
 greedy_ratio = 0.8
-control = opt.control    #!!!!!!!!!!!!
 use_beam_search = opt.beam_size > 0
 stochastic_beam_search = opt.stochastic_beam_search
 beam_size = opt.beam_size
@@ -105,12 +90,9 @@ else:
     beam_size = 'DISABLED'
 
 assert os.path.isfile(sess_path), f'"{sess_path}" is not a file'
-# control_dict={'1,0,1,0,1,1,0,1,0,1,0,1':'C大调','3,0,1,0,1,3,0,3,0,1,0,1':'C大调','2,0,1,0,1,2,0,2,0,1,0,1':'C大调',
-#               '2,0,1,1,0,2,0,2,1,0,1,0':'C小调','3,0,1,1,0,3,0,3,1,0,1,0':'C小调','2,0,1,1,0,2,0,2,1,0,1,0':'C小调',}
-# controls=[';1',';2',';3',';4',';5',';6',';7',';8']
-controls=[]
-name_dict ={'1,0,0': 'happy', '0,1,0':'sad', '1,1,1':'unspecified'}
 
+name_dict ={'1,0,0': 'happy', '0,1,0':'sad', '1,1,1':'unspecified'}
+controls=[]
 
 for den_num in [1, 2, 3, 4]:
     for pitches_num in [0, 1, 2, '']:
@@ -123,8 +105,8 @@ for control in controls:
     mode, note_density, avg_pitches_count, entropy = control.split(';')
 
     control_name = name_dict[mode]
-    if control is not None: #Get control based on pitch_histogram and note_density
-        if os.path.isfile(control) or os.path.isdir(control): # get control info from midi file
+    if control is not None:
+        if os.path.isfile(control) or os.path.isdir(control):
             if os.path.isdir(control):
                 files = list(utils.find_files_by_extensions(control))
                 assert len(files) > 0, f'no file in "{control}"'
@@ -139,11 +121,11 @@ for control in controls:
 
         else:
             mode, note_density, avg_pitches_count, entropy = control.split(';')
-            mode = list(filter(len, mode.split(','))) # to pitch_histogram char list
+            mode = list(filter(len, mode.split(',')))
             if len(mode) == 0:
                 mode = np.ones(3) / 3
             else:
-                mode = np.array(list(map(float, mode))) #to pitch_histogram float nparray
+                mode = np.array(list(map(float, mode)))
                 assert mode.size == 3
                 assert np.all(mode >= 0)
                 mode = mode / mode.sum() \
@@ -169,7 +151,7 @@ for control in controls:
 
             control = Control(mode.tolist(), note_density, avg_pitches_count, entropy)
             controls = torch.tensor(control.to_array(), dtype=torch.float32)
-            controls = controls.repeat(1, batch_size, 1).to(device) # 1Xbatch_sizeX controls
+            controls = controls.repeat(1, batch_size, 1).to(device)
             control = repr(control)
 
     else:
@@ -223,7 +205,7 @@ for control in controls:
                                      temperature=temperature,
                                      verbose=True)
 
-    outputs = outputs.cpu().numpy().T  # [batch, sample_length(event_num)],T=transport
+    outputs = outputs.cpu().numpy().T
 
     # ========================================================================
     # Saving

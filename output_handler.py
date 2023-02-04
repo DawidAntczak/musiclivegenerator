@@ -8,20 +8,14 @@ class OutputHandler:
     server = None
     model = None
     init = None
-    collect_every = None
     greedy = None
-    temperature = None
 
-    def __init__(self, collect_every=50):
-        self.collect_every = collect_every
-
-    def start(self, server, model, init, greedy=1.0, temperature=1.0):
+    def start(self, server, model, init, greedy=1.0):
         self.server = server
         self.model = model
         self.init = init
         self.model.init_live_generation(init)
         self.greedy = greedy
-        self.temperature = temperature
 
     async def input_received(self, raw_input_json):
         input = Input(raw_input_json)
@@ -32,7 +26,7 @@ class OutputHandler:
             self.model.init_live_generation(self.init)
 
         outputs = self.model.generate_live(time_length=requested_time_length, controls=transformed_input,
-                                           greedy=self.greedy, temperature=self.temperature)
+                                           greedy=self.greedy, temperature=input.get_temperature())
         await self.send_as_midi(outputs)
 
     async def send_as_midi(self, outputs):
