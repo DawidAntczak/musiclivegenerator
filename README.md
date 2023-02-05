@@ -1,40 +1,49 @@
 
-# EmotionBox: a music-element-driven emotional music generation system based on music psychology
+# musiclivegenerator
+Tools created while working on the master's thesis: ***Automatic music generation methods for video games***
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-PyTorch implementation of EmotionBox, the paper is available on 
-[https://arxiv.org/abs/2112.08561](https://arxiv.org/abs/2112.08561).
 
-The codes contain the proposed method and label-based method.
+The repository contains the model, second and third (last) step of data preparation, scripts to run WebSocket server for live generation and script to generate some sample MIDI files.
 
-The trained models are in the release, and you can download them and put them in the .\save dir to generate music.
+The trained model is included in *save* directory as *everything-game-30s-transposed.sess*.
 
-## Generated Samples
+## Generation
+- To generate MIDI file samples with various conditioning:
+    ```shell
+    Run generate.py 
+    ```
+- To start WebSocket server for live generation:
+    ```shell
+    Run generate_live.py 
+    ```
 
-    Run the generate.py to generate music using EmotionBox.
-    Run the generate_label.py to generate music using label-based method.
 
+## Training
 
-## Training Instructions
+- [First data preparation step](https://github.com/DawidAntczak/musiclivegeneratorcsharp)
 
-- Preprocessing
+- Second data preparation step:
+    ```shell
+    Run data_prep.py 
+    ```
 
+- Preprocessing:
     ```shell
     Run preprocess.py 
     ```
 
 - Training
     ```shell
-    Run train.py 
+    Run train.py
+    
 ## Requirements
+Everything was run on Windows in Anaconda environment exported to [requirements.txt](https://github.com/DawidAntczak/musiclivegenerator/blob/main/requirements.txt).
 
-- pretty_midi
-- numpy
-- pytorch >= 0.4
-- tensorboardX
-- progress
 
-## acknowledgement
+## Acknowledgement
+Code based on implementation of [EmotionBox](https://github.com/KaitongZheng/EmotionBox), the paper is available on 
+[https://arxiv.org/abs/2112.08561](https://arxiv.org/abs/2112.08561).
 
-We thank for the codes of [Performance-RNN-PyTorch](https://github.com/djosix/Performance-RNN-PyTorch) from djosix.
+[Original license file included](https://github.com/DawidAntczak/musiclivegenerator/blob/main/ORIGINAL_LICENSE)
