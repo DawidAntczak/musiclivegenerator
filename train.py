@@ -39,7 +39,7 @@ def get_options():
     parser.add_option('-d', '--dataset',
                       dest='data_path',
                       type='string',
-                      default='dataset/everything-game-30s-transposed-4')
+                      default='dataset/everything-game-30s-transposed')
 
     parser.add_option('-i', '--saving-interval',
                       dest='saving_interval',

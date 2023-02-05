@@ -94,7 +94,7 @@ if __name__ == '__main__':
 
     metadata = preprocess_midi_files_under(
         midi_root=r'',  # input
-        save_dir=r'',   # output
+        save_dir=r'dataset/everything-game-30s-transposed',   # output
         num_workers=4)
 
 
