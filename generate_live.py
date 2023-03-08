@@ -1,3 +1,5 @@
+import functools
+
 import torch
 import os
 import optparse
@@ -91,7 +93,7 @@ model.eval()
 print(model)
 print('-' * 70)
 
-init = init(init_zero)
+init_func = functools.partial(init, init_zero)
 
 output_handler = OutputHandler()
 
@@ -101,7 +103,7 @@ server = WsServer(on_start=lambda: listeners_awaiting_start.add(""),
 thread = Thread(target=lambda: run_server(server))
 thread.start()
 
-output_handler.start(server, model, init, greedy=greedy_ratio)
+output_handler.start(server, model, init_func, greedy=greedy_ratio)
 
 while len(listeners_awaiting_start) < 1:    # hacky way to start server and wait for any listener
     pass

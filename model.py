@@ -13,8 +13,6 @@ from sequence import EventSeq
 
 
 class PerformanceRNN(nn.Module):
-    next_input_data = None
-
     def __init__(self, event_dim, control_dim, init_dim, hidden_dim,
                  gru_layers=3, gru_dropout=0.3):
         super().__init__()

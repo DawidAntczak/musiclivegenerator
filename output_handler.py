@@ -7,14 +7,14 @@ from input import Input
 class OutputHandler:
     server = None
     model = None
-    init = None
+    init_func = None
     greedy = None
 
-    def start(self, server, model, init, greedy=1.0):
+    def start(self, server, model, init_func, greedy=1.0):
         self.server = server
         self.model = model
-        self.init = init
-        self.model.init_live_generation(init)
+        self.init_func = init_func
+        self.model.init_live_generation(init_func())
         self.greedy = greedy
 
     async def input_received(self, raw_input_json):
@@ -23,7 +23,7 @@ class OutputHandler:
         requested_time_length = input.get_requested_time_length()
 
         if input.should_reset():
-            self.model.init_live_generation(self.init)
+            self.model.init_live_generation(self.init_func())
 
         outputs = self.model.generate_live(time_length=requested_time_length, controls=transformed_input,
                                            greedy=self.greedy, temperature=input.get_temperature())
