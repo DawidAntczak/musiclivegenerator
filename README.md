@@ -39,7 +39,7 @@ The trained model is included in *save* directory as *everything-game-30s-transp
     Run train.py
     
 ## Requirements
-Everything was run using Python 3.8 on Windows in Anaconda environment exported to [requirements.txt](https://github.com/DawidAntczak/musiclivegenerator/blob/main/requirements.txt).
+Everything was run using Python 3.8 on Windows in Anaconda environment. The environment can be imported using [anaconda.yaml](https://github.com/DawidAntczak/musiclivegenerator/blob/main/anaconda.yaml) as described in [docs] (https://docs.anaconda.com/navigator/tutorials/manage-environments/#importing-an-environment).
 
 
 ## Acknowledgement
